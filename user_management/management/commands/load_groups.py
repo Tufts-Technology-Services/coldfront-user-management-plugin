@@ -1,11 +1,12 @@
-import logging
 import csv
 import json
+import logging
 import os
-from django.conf import settings
-from django.core.management.base import BaseCommand
+
 import coldfront.core.allocation.models as allocation_models
 import coldfront.core.project.models as project_models
+from django.conf import settings
+from django.core.management.base import BaseCommand
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +19,21 @@ class Command(BaseCommand):
         self.differences = {}  # to track changes made
 
     def add_arguments(self, parser):
-        parser.add_argument("-a", "--alignment", help="Set group alignment at 'project' or 'allocation' level", choices=['project', 'allocation'], required=False)
+        parser.add_argument(
+            "-a",
+            "--alignment",
+            help="Set group alignment at 'project' or 'allocation' level",
+            choices=["project", "allocation"],
+            required=False,
+        )
         parser.add_argument("-i", "--input-file", help="Path to input file containing group mappings", required=True)
         parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
-        parser.add_argument("-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true")
-        parser.add_argument("-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2)
+        parser.add_argument(
+            "-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true"
+        )
+        parser.add_argument(
+            "-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2
+        )
 
     def set_verbosity(self, level):
         """Set the logging verbosity level."""
@@ -42,7 +53,7 @@ class Command(BaseCommand):
         Process the input file and return a dictionary of group mappings.
         The input file should be a CSV with two columns: 'name' and 'group'.
         """
-        with open(input_file, mode='r', encoding='utf-8') as file:
+        with open(input_file, mode="r", encoding="utf-8") as file:
             rows = csv.DictReader(file)
             return self.__parse_input_data(rows)
 
@@ -50,8 +61,8 @@ class Command(BaseCommand):
         """
         Process the input file and return a dictionary of group mappings.
         The input file should be a JSON object with keys as names and values as groups.
-        """        
-        with open(input_file, mode='r', encoding='utf-8') as file:
+        """
+        with open(input_file, mode="r", encoding="utf-8") as file:
             data = json.load(file)
             return self.__parse_input_data(data)
 
@@ -63,10 +74,10 @@ class Command(BaseCommand):
         """
         group_mappings = {}
         for row in rows:
-            project = row.get('project')
-            pi_username = row.get('pi_username')
-            allocation_id = row.get('allocation_id')
-            group = row.get('group')
+            project = row.get("project")
+            pi_username = row.get("pi_username")
+            allocation_id = row.get("allocation_id")
+            group = row.get("group")
 
             if group is None or group.strip() == "":
                 logger.warning("Skipping row with empty group: %s", row)
@@ -78,17 +89,20 @@ class Command(BaseCommand):
             else:
                 logger.warning("Skipping invalid row: %s", row)
         return group_mappings
-    
+
     def get_project_attribute_type(self, group_attribute_name, dry_run):
         # check if the ProjectAttributeType exists
-        project_attribute_type, created = project_models.ProjectAttributeType.objects.get_or_create(name=group_attribute_name, defaults={
-            "attribute_type": project_models.AttributeType.objects.get(name="Text"),
-            "has_usage": False,
-            "is_required": False,
-            "is_unique": False,
-            "is_private": False,
-            "is_changeable": True
-        })
+        project_attribute_type, created = project_models.ProjectAttributeType.objects.get_or_create(
+            name=group_attribute_name,
+            defaults={
+                "attribute_type": project_models.AttributeType.objects.get(name="Text"),
+                "has_usage": False,
+                "is_required": False,
+                "is_unique": False,
+                "is_private": False,
+                "is_changeable": True,
+            },
+        )
         if created and not dry_run:
             logger.info("Created ProjectAttributeType '%s'.", group_attribute_name)
         else:
@@ -116,61 +130,73 @@ class Command(BaseCommand):
                 # todo: should have an option to not overwrite existing values
                 if project_attributes.first().value == group_for_project:
                     logger.info("    Group attribute already set to %s. Skipping.", group_for_project)
-                    self.differences["skipped"].append({
-                        "mapping_key": f"{project.title}_{project.pi.username}".lower().strip(),
-                        "project": project.title,
-                        "project_pi": project.pi.username,
-                        "group": group_for_project,
-                        "new_group": group_for_project
-                    })
+                    self.differences["skipped"].append(
+                        {
+                            "mapping_key": f"{project.title}_{project.pi.username}".lower().strip(),
+                            "project": project.title,
+                            "project_pi": project.pi.username,
+                            "group": group_for_project,
+                            "new_group": group_for_project,
+                        }
+                    )
                     continue
                 if not dry_run:
                     project_attributes.first().update(value=group_for_project)
                     logger.info("    Updated group attribute to %s for project %s.", group_for_project, project.title)
                 # log changes
-                self.differences["updated"].append({
-                    "mapping_key": f"{project.title}_{project.pi.username}".lower().strip(),
-                    "project": project.title,
-                    "project_pi": project.pi.username,
-                    "group": project_attributes.first().value, # assuming only one attribute of this type per project
-                    "new_group": group_for_project
-                })
+                self.differences["updated"].append(
+                    {
+                        "mapping_key": f"{project.title}_{project.pi.username}".lower().strip(),
+                        "project": project.title,
+                        "project_pi": project.pi.username,
+                        "group": project_attributes.first().value,  # assuming only one attribute of this type per project
+                        "new_group": group_for_project,
+                    }
+                )
             else:
                 logger.info("  Project %s does not have group attribute defined.", project.title)
 
                 if not dry_run:
                     # create the ProjectAttribute with the value from passed argument
                     pa = project_models.ProjectAttribute(
-                        project=project, 
-                        project_attribute_type=project_attribute_type, 
-                        value=group_for_project)
+                        project=project, project_attribute_type=project_attribute_type, value=group_for_project
+                    )
                     pa.save()
-                    logger.info("    Created group attribute %s=%s for project %s.", 
-                                project_attribute_type.name, group_for_project, project.title)
-                    self.differences["added"].append({
-                        "mapping_key": f"{project.title}_{project.pi.username}".lower().strip(),
-                        "project": project.title,
-                        "project_pi": project.pi.username,
-                        "group": "",
-                        "new_group": group_for_project
-                    })
-    
+                    logger.info(
+                        "    Created group attribute %s=%s for project %s.",
+                        project_attribute_type.name,
+                        group_for_project,
+                        project.title,
+                    )
+                    self.differences["added"].append(
+                        {
+                            "mapping_key": f"{project.title}_{project.pi.username}".lower().strip(),
+                            "project": project.title,
+                            "project_pi": project.pi.username,
+                            "group": "",
+                            "new_group": group_for_project,
+                        }
+                    )
+
     def get_allocation_attribute_type(self, group_attribute_name, dry_run):
         # check if the AllocationAttributeType exists
-        allocation_attribute_type, created = allocation_models.AllocationAttributeType.objects.get_or_create(name=group_attribute_name, defaults={
-            "attribute_type": allocation_models.AttributeType.objects.get(name="Text"),
-            "has_usage": False,
-            "is_required": False,
-            "is_unique": False,
-            "is_private": False,
-            "is_changeable": True
-        })
+        allocation_attribute_type, created = allocation_models.AllocationAttributeType.objects.get_or_create(
+            name=group_attribute_name,
+            defaults={
+                "attribute_type": allocation_models.AttributeType.objects.get(name="Text"),
+                "has_usage": False,
+                "is_required": False,
+                "is_unique": False,
+                "is_private": False,
+                "is_changeable": True,
+            },
+        )
         if created and not dry_run:
             logger.info("Created AllocationAttributeType '%s'.", group_attribute_name)
         else:
-            logger.info("AllocationAttributeType '%s' already exists.", group_attribute_name)   
+            logger.info("AllocationAttributeType '%s' already exists.", group_attribute_name)
         return allocation_attribute_type
-    
+
     def set_group_attribute_for_allocations(self, allocation_attribute_type, group_mappings, dry_run):
         # get a list of allocations
         allocations = allocation_models.Allocation.objects.filter(status__name="Active")
@@ -179,57 +205,76 @@ class Command(BaseCommand):
             # get the group for the current allocation from the input file
             group_for_allocation = group_mappings.get(str(allocation.pk))
             # check if the current allocation has the group attribute defined
-            allocation_attributes = allocation.allocationattribute_set.filter(allocation_attribute_type=allocation_attribute_type)
+            allocation_attributes = allocation.allocationattribute_set.filter(
+                allocation_attribute_type=allocation_attribute_type
+            )
             if allocation_attributes.exists():
                 logger.info("  Allocation %s has group attribute defined.", allocation.project.title)
                 # update if different than passed value, otherwise do nothing
                 if allocation_attributes.first().value == group_for_allocation:
                     logger.info("    Group attribute already set to %s. Skipping.", group_for_allocation)
-                    self.differences["skipped"].append({
-                        "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
-                        "allocation": allocation.resource.name,
-                        "allocation_id": allocation.pk,
-                        "group": group_for_allocation,
-                        "new_group": group_for_allocation
-                    })
+                    self.differences["skipped"].append(
+                        {
+                            "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
+                            "allocation": allocation.resource.name,
+                            "allocation_id": allocation.pk,
+                            "group": group_for_allocation,
+                            "new_group": group_for_allocation,
+                        }
+                    )
                     continue
                 if not dry_run:
                     allocation_attributes.first().update(value=group_for_allocation)
-                    logger.info("    Updated group attribute to %s for allocation %s.", group_for_allocation, allocation.project.title)
+                    logger.info(
+                        "    Updated group attribute to %s for allocation %s.",
+                        group_for_allocation,
+                        allocation.project.title,
+                    )
                     # log changes
-                    self.differences["updated"].append({
-                        "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
-                        "allocation": allocation.resource.name,
-                        "allocation_id": allocation.pk,
-                        "group": allocation_attributes.first().value,
-                        "new_group": group_for_allocation
-                    })
+                    self.differences["updated"].append(
+                        {
+                            "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
+                            "allocation": allocation.resource.name,
+                            "allocation_id": allocation.pk,
+                            "group": allocation_attributes.first().value,
+                            "new_group": group_for_allocation,
+                        }
+                    )
             else:
-                logger.info("  Allocation %s(%s) does not have group attribute defined.", allocation.name, allocation.pk)
+                logger.info(
+                    "  Allocation %s(%s) does not have group attribute defined.", allocation.name, allocation.pk
+                )
                 if not dry_run:
                     # create the AllocationAttribute with the value from passed argument
                     aa = allocation_models.AllocationAttribute(
-                        allocation=allocation, 
-                        allocation_attribute_type=allocation_attribute_type, 
-                        value=group_for_allocation)
+                        allocation=allocation,
+                        allocation_attribute_type=allocation_attribute_type,
+                        value=group_for_allocation,
+                    )
                     aa.save()
-                    logger.info("    Created group attribute %s=%s for allocation %s.",
-                                allocation_attribute_type.name, group_for_allocation, allocation.resource.name)
-                    self.differences["added"].append({
-                        "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
-                        "allocation": allocation.resource.name,
-                        "allocation_id": allocation.pk,
-                        "group": "",
-                        "new_group": group_for_allocation
-                    })
-    
+                    logger.info(
+                        "    Created group attribute %s=%s for allocation %s.",
+                        allocation_attribute_type.name,
+                        group_for_allocation,
+                        allocation.resource.name,
+                    )
+                    self.differences["added"].append(
+                        {
+                            "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
+                            "allocation": allocation.resource.name,
+                            "allocation_id": allocation.pk,
+                            "group": "",
+                            "new_group": group_for_allocation,
+                        }
+                    )
+
     def handle_input_file(self, input_file):
         if not input_file:
             logger.error("Input file is required.")
             raise ValueError("Input file is required.")
-        if input_file.endswith('.csv'):
+        if input_file.endswith(".csv"):
             group_mappings = self.process_csv_input_file(input_file)
-        elif input_file.endswith('.json'):
+        elif input_file.endswith(".json"):
             group_mappings = self.process_json_input_file(input_file)
         else:
             logger.error("Unsupported input file format. Please provide a CSV or JSON file.")
@@ -239,17 +284,19 @@ class Command(BaseCommand):
             raise ValueError("No valid group mappings found in input file.")
         logger.debug("Processed %d group mappings from input file.", len(group_mappings))
         return group_mappings
-    
+
     def parse_alignment(self, alignment):
         default_alignment = "project" if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL else "allocation"
-        if alignment not in ['project', 'allocation', None]:
+        if alignment not in ["project", "allocation", None]:
             logger.error("Invalid alignment specified. Must be 'project' or 'allocation'.")
             raise ValueError("Invalid alignment specified. Must be 'project' or 'allocation'.")
         if alignment is None:
             alignment = default_alignment
 
         if alignment != default_alignment:
-            logger.warning("Specified alignment '%s' differs from default setting. Proceeding with specified alignment.", alignment)
+            logger.warning(
+                "Specified alignment '%s' differs from default setting. Proceeding with specified alignment.", alignment
+            )
         logger.info("Setting group alignment at the '%s' level.", alignment)
         return alignment
 
@@ -257,32 +304,44 @@ class Command(BaseCommand):
         # compare differences with group mappings from input file, add any missing entries to 'skipped'
         input_keys = set(group_mappings.keys())
         processed_keys = set()
-        for change_type in ['added', 'updated', 'skipped']:
+        for change_type in ["added", "updated", "skipped"]:
             for change in self.differences[change_type]:
-                processed_keys.add(change['mapping_key'])
+                processed_keys.add(change["mapping_key"])
         # these input keys didn't match any existing projects/allocations
         missing_keys = input_keys - processed_keys
         for key in missing_keys:
-            self.differences["skipped"].append({
-                "mapping_key": key,
-                "group": group_mappings[key]
-            })
-        logger.debug("Processed %d changes: %d added, %d updated, %d skipped.", 
-                    len(self.differences['added']) + len(self.differences['updated']) + len(self.differences['skipped']),
-                    len(self.differences['added']), len(self.differences['updated']), len(self.differences['skipped']))
+            self.differences["skipped"].append({"mapping_key": key, "group": group_mappings[key]})
+        logger.debug(
+            "Processed %d changes: %d added, %d updated, %d skipped.",
+            len(self.differences["added"]) + len(self.differences["updated"]) + len(self.differences["skipped"]),
+            len(self.differences["added"]),
+            len(self.differences["updated"]),
+            len(self.differences["skipped"]),
+        )
         # write differences to output file
-        if output_file.endswith('.csv'):
-            with open(output_file, mode='w', encoding='utf-8', newline='') as file:
-                fieldnames = ['mapping_key', 'project', 'project_pi', 'allocation', 'allocation_id', 'old_value', 'new_value', 'value', 'group', 'action']
+        if output_file.endswith(".csv"):
+            with open(output_file, mode="w", encoding="utf-8", newline="") as file:
+                fieldnames = [
+                    "mapping_key",
+                    "project",
+                    "project_pi",
+                    "allocation",
+                    "allocation_id",
+                    "old_value",
+                    "new_value",
+                    "value",
+                    "group",
+                    "action",
+                ]
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
-                for change_type in ['added', 'updated', 'skipped']:
+                for change_type in ["added", "updated", "skipped"]:
                     for change in self.differences[change_type]:
-                        change['action'] = change_type
+                        change["action"] = change_type
                         writer.writerow(change)
                 logger.info("Wrote differences to output file %s.", output_file)
-        elif output_file.endswith('.json'):
-            with open(output_file, mode='w', encoding='utf-8') as file:
+        elif output_file.endswith(".json"):
+            with open(output_file, mode="w", encoding="utf-8") as file:
                 json.dump(self.differences, file, indent=4)
                 logger.info("Wrote differences to output file %s.", output_file)
 
@@ -295,7 +354,7 @@ class Command(BaseCommand):
 
         input_file = options.get("input_file")
         group_mappings = self.handle_input_file(input_file)
-        
+
         output_file = options.get("output_file")
         if not output_file:
             logger.error("Output file is required.")
@@ -313,17 +372,15 @@ class Command(BaseCommand):
         # processes a list of groups mapped to projects or allocations
         # determine whether to set attributes at the project or allocation level
         group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
-        if alignment == 'project':
+        if alignment == "project":
             logger.info("Setting group attribute at the project level...")
             project_attribute_type = self.get_project_attribute_type(group_attribute_name, dry_run)
-            self.set_group_attribute_for_projects(project_attribute_type,
-                                                  group_mappings, dry_run)
+            self.set_group_attribute_for_projects(project_attribute_type, group_mappings, dry_run)
 
         else:
             logger.info("Setting group attribute at the allocation level...")
             allocation_attribute_type = self.get_allocation_attribute_type(group_attribute_name, dry_run)
-            self.set_group_attribute_for_allocations(allocation_attribute_type,
-                                                     group_mappings, dry_run)
+            self.set_group_attribute_for_allocations(allocation_attribute_type, group_mappings, dry_run)
         logger.info("Group attribute update process complete.")
 
         self.handle_differences(group_mappings, output_file)

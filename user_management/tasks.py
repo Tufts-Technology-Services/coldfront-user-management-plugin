@@ -1,12 +1,14 @@
 import logging
-from django.conf import settings
+
 from coldfront.core.allocation.models import AllocationUser
 from coldfront.core.allocation.utils import set_allocation_user_status_to_error
 from coldfront.core.project.models import Project, ProjectUser
+from django.conf import settings
+
 from user_management import utils
 
 logger = logging.getLogger(__name__)
-            
+
 
 def add_allocation_user_to_group(user_pk):
     """
@@ -32,8 +34,12 @@ def add_allocation_user_to_group(user_pk):
     if len(groups) == 0:
         logger.info("Allocation does not have any groups. Nothing to add")
         return False
-    logger.debug("DEBUG: calling add_user_to_group_set for user %s and groups %s", allocation_user.user.username, groups)
-    utils.add_user_to_group_set(allocation_user.user.username, groups, error_callback=set_allocation_user_status_to_error) # for allocation: set_allocation_user_status_to_error(user_pk) on error
+    logger.debug(
+        "DEBUG: calling add_user_to_group_set for user %s and groups %s", allocation_user.user.username, groups
+    )
+    utils.add_user_to_group_set(
+        allocation_user.user.username, groups, error_callback=set_allocation_user_status_to_error
+    )  # for allocation: set_allocation_user_status_to_error(user_pk) on error
     return True
 
 
@@ -61,7 +67,9 @@ def add_project_user_to_group(user_pk):
         logger.info("Project does not have any groups. Nothing to add")
         return
 
-    utils.add_user_to_group_set(project_user.user.username, groups, error_callback=utils.set_project_user_status_to_pending)
+    utils.add_user_to_group_set(
+        project_user.user.username, groups, error_callback=utils.set_project_user_status_to_pending
+    )
 
 
 def remove_allocation_user_from_group(user_pk):
@@ -95,16 +103,22 @@ def remove_allocation_user_from_group(user_pk):
         return
 
     # Ensure we don't remove the user from groups they belong to in other active allocations.
-    other_groups = utils.collect_other_allocation_user_groups(allocation_user.user, group_attribute_name, allocation_user.allocation.pk)
+    other_groups = utils.collect_other_allocation_user_groups(
+        allocation_user.user, group_attribute_name, allocation_user.allocation.pk
+    )
 
     group_diff = set(groups).difference(other_groups)
 
     if len(group_diff) == 0:
-        logger.info("No groups to remove. User may belong to these groups in other active allocations: %s", set(groups).intersection(other_groups))
+        logger.info(
+            "No groups to remove. User may belong to these groups in other active allocations: %s",
+            set(groups).intersection(other_groups),
+        )
         return
 
-    utils.remove_user_from_group_set(allocation_user.user.username, group_diff, error_callback=set_allocation_user_status_to_error) # for allocation: set_allocation_user_status_to_error(user_pk) on error
-
+    utils.remove_user_from_group_set(
+        allocation_user.user.username, group_diff, error_callback=set_allocation_user_status_to_error
+    )  # for allocation: set_allocation_user_status_to_error(user_pk) on error
 
 
 def remove_project_user_from_group(user_pk):
@@ -121,7 +135,7 @@ def remove_project_user_from_group(user_pk):
     project_user = ProjectUser.objects.get(pk=user_pk)
     if project_user.project.status.name in [
         "Archived",
-        ]:
+    ]:
         logger.warning("Project is archived. Will not remove user from group")
         return
 
@@ -135,14 +149,20 @@ def remove_project_user_from_group(user_pk):
         return
 
     # Ensure we don't remove the user from groups they belong to in other active projects.
-    other_groups = utils.collect_other_project_user_groups(project_user.user, group_attribute_name, project_user.project.pk)
+    other_groups = utils.collect_other_project_user_groups(
+        project_user.user, group_attribute_name, project_user.project.pk
+    )
     group_diff = set(groups).difference(other_groups)
 
     if len(group_diff) == 0:
-        logger.info("No groups to remove. User may belong to these groups in other active or new projects: %s", other_groups)
+        logger.info(
+            "No groups to remove. User may belong to these groups in other active or new projects: %s", other_groups
+        )
         return
 
-    utils.remove_user_from_group_set(project_user.user.username, group_diff, error_callback=utils.set_project_user_status_to_pending)
+    utils.remove_user_from_group_set(
+        project_user.user.username, group_diff, error_callback=utils.set_project_user_status_to_pending
+    )
 
 
 def remove_all_project_users_from_groups(project_pk):
@@ -158,7 +178,7 @@ def remove_all_project_users_from_groups(project_pk):
     if project.status.name != "Archived":
         logger.warning("Project is not archived. Will not remove users from groups")
         return
-    
+
     groups = set(project.get_attribute_list(group_attribute_name))
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to remove")
@@ -166,21 +186,30 @@ def remove_all_project_users_from_groups(project_pk):
 
     project_users = ProjectUser.objects.filter(project__pk=project_pk)
     for project_user in project_users:
-
         # Ensure we don't remove the user from groups they belong to in other active projects.
         other_groups = utils.collect_other_project_user_groups(project_user.user, group_attribute_name, project_pk)
         group_diff = set(groups).difference(other_groups)
 
         if len(group_diff) == 0:
-            logger.info("No groups to remove for user %s. User may belong to these groups in other active or new projects: %s", project_user.user.username, other_groups)
+            logger.info(
+                "No groups to remove for user %s. User may belong to these groups in other active or new projects: %s",
+                project_user.user.username,
+                other_groups,
+            )
             continue
-        utils.remove_user_from_group_set(project_user.user.username, group_diff, error_callback=utils.set_project_user_status_to_pending)
-    
+        utils.remove_user_from_group_set(
+            project_user.user.username, group_diff, error_callback=utils.set_project_user_status_to_pending
+        )
+
     # remove PI from project groups as well
     pi_user = project.pi
     other_groups = utils.collect_other_project_user_groups(pi_user, group_attribute_name, project_pk)
     group_diff = set(groups).difference(other_groups)
     if len(group_diff) == 0:
-        logger.info("No groups to remove for PI %s. User may belong to these groups in other active or new projects: %s", pi_user.username, other_groups)
+        logger.info(
+            "No groups to remove for PI %s. User may belong to these groups in other active or new projects: %s",
+            pi_user.username,
+            other_groups,
+        )
         return
     utils.remove_user_from_group_set(pi_user.username, group_diff)

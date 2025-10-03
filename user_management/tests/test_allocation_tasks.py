@@ -1,9 +1,10 @@
 from unittest.mock import patch
-from django.test import TestCase, override_settings
+
 from coldfront.core.allocation.utils import set_allocation_user_status_to_error
 from coldfront.core.test_helpers.factories import AllocationUserFactory
-from user_management.tasks import (add_allocation_user_to_group, 
-                                                     remove_allocation_user_from_group)
+from django.test import TestCase, override_settings
+
+from user_management.tasks import add_allocation_user_to_group, remove_allocation_user_from_group
 
 
 @override_settings(USER_MANAGEMENT_CLIENT_PATH="user_management/tests/helpers.py")
@@ -18,11 +19,15 @@ class AddAllocationUserToGroupTests(TestCase):
     def test_success(self, mock_add_user_to_group_set, mock_AllocationUser):
         self.allocation_user.status.name = "Active"
         self.allocation_user.allocation.status.name = "Active"
-        self.allocation_user.allocation.get_attribute_list = lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        self.allocation_user.allocation.get_attribute_list = (
+            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        )
         mock_AllocationUser.objects.get.return_value = self.allocation_user
         mock_add_user_to_group_set.return_value = None
         _ = add_allocation_user_to_group(int(mock_AllocationUser.pk))
-        mock_add_user_to_group_set.assert_called_once_with("testuser", {"group1", "group2"}, error_callback=set_allocation_user_status_to_error)
+        mock_add_user_to_group_set.assert_called_once_with(
+            "testuser", {"group1", "group2"}, error_callback=set_allocation_user_status_to_error
+        )
 
     @patch("user_management.tasks.AllocationUser")
     @patch("user_management.tasks.logger")
@@ -69,19 +74,27 @@ class RemoveAllocationUserFromGroupTests(TestCase):
     def setUp(self):
         self.allocation_user = AllocationUserFactory()
         self.allocation_user.user.username = "testuser"
-    
+
     @patch("user_management.utils.remove_user_from_group_set")
     @patch("user_management.utils.collect_other_allocation_user_groups")
     @patch("user_management.tasks.AllocationUser")
-    def test_success(self, mock_allocation_user, mock_collect_other_allocation_user_groups, mock_remove_user_from_group_set):
+    def test_success(
+        self, mock_allocation_user, mock_collect_other_allocation_user_groups, mock_remove_user_from_group_set
+    ):
         self.allocation_user.status.name = "Removed"
         self.allocation_user.allocation.status.name = "Active"
-        self.allocation_user.allocation.get_attribute_list = lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []       
+        self.allocation_user.allocation.get_attribute_list = (
+            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        )
         mock_allocation_user.objects.get.return_value = self.allocation_user
         mock_collect_other_allocation_user_groups.return_value = []
         remove_allocation_user_from_group(mock_allocation_user.pk)
-        mock_collect_other_allocation_user_groups.assert_called_once_with(self.allocation_user.user, "ad_group", self.allocation_user.allocation.pk)
-        mock_remove_user_from_group_set.assert_called_once_with("testuser", {"group1", "group2"}, error_callback=set_allocation_user_status_to_error)
+        mock_collect_other_allocation_user_groups.assert_called_once_with(
+            self.allocation_user.user, "ad_group", self.allocation_user.allocation.pk
+        )
+        mock_remove_user_from_group_set.assert_called_once_with(
+            "testuser", {"group1", "group2"}, error_callback=set_allocation_user_status_to_error
+        )
 
     @patch("user_management.tasks.AllocationUser")
     @patch("user_management.tasks.logger")
@@ -98,7 +111,9 @@ class RemoveAllocationUserFromGroupTests(TestCase):
         self.allocation_user.status.name = "Active"
         mock_allocation_user.objects.get.return_value = self.allocation_user
         remove_allocation_user_from_group(mock_allocation_user.pk)
-        mock_logger.warning.assert_called_with("Allocation user status is not 'Removed'. Will not remove user from group.")
+        mock_logger.warning.assert_called_with(
+            "Allocation user status is not 'Removed'. Will not remove user from group."
+        )
 
     @patch("user_management.tasks.AllocationUser")
     @patch("user_management.tasks.logger")

@@ -1,15 +1,19 @@
 from unittest.mock import patch
-from django.test import TestCase, override_settings
+
 from coldfront.core.test_helpers.factories import ProjectFactory, ProjectUserFactory, UserFactory
+from django.test import TestCase, override_settings
+
+from user_management.tasks import (
+    add_project_user_to_group,
+    remove_all_project_users_from_groups,
+    remove_project_user_from_group,
+)
 from user_management.utils import set_project_user_status_to_pending
-from user_management.tasks import (add_project_user_to_group, remove_all_project_users_from_groups, 
-                                                     remove_project_user_from_group)
 
 
 @override_settings(USER_MANAGEMENT_CLIENT_PATH="user_management/tests/helpers.py")
 @override_settings(UNIX_GROUP_ATTRIBUTE_NAME="ad_group")
 class AddProjectUserToGroupTests(TestCase):
-
     def setUp(self):
         self.project_user = ProjectUserFactory()
         self.project_user.user.username = "testuser"
@@ -19,11 +23,15 @@ class AddProjectUserToGroupTests(TestCase):
     def test_success(self, mock_add_user_to_group_set, mock_project_user):
         self.project_user.status.name = "Active"
         self.project_user.project.status.name = "Active"
-        self.project_user.project.get_attribute_list = lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []       
+        self.project_user.project.get_attribute_list = (
+            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        )
         mock_project_user.objects.get.return_value = self.project_user
         mock_add_user_to_group_set.return_value = None
         add_project_user_to_group(mock_project_user.pk)
-        mock_add_user_to_group_set.assert_called_once_with("testuser", {"group1", "group2"}, error_callback=set_project_user_status_to_pending)
+        mock_add_user_to_group_set.assert_called_once_with(
+            "testuser", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+        )
 
     @patch("user_management.tasks.ProjectUser")
     @patch("user_management.tasks.logger")
@@ -66,12 +74,18 @@ class RemoveProjectUserFromGroupTests(TestCase):
     def test_success(self, mock_project_user, mock_collect_other_project_user_groups, mock_remove_user_from_group_set):
         self.project_user.status.name = "Removed"
         self.project_user.project.status.name = "Active"
-        self.project_user.project.get_attribute_list = lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []       
+        self.project_user.project.get_attribute_list = (
+            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        )
         mock_project_user.objects.get.return_value = self.project_user
         mock_collect_other_project_user_groups.return_value = set()
         remove_project_user_from_group(mock_project_user.pk)
-        mock_collect_other_project_user_groups.assert_called_once_with(self.project_user.user, "ad_group", self.project_user.project.pk)
-        mock_remove_user_from_group_set.assert_called_once_with("testuser", {"group1", "group2"}, error_callback=set_project_user_status_to_pending)
+        mock_collect_other_project_user_groups.assert_called_once_with(
+            self.project_user.user, "ad_group", self.project_user.project.pk
+        )
+        mock_remove_user_from_group_set.assert_called_once_with(
+            "testuser", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+        )
 
     @patch("user_management.tasks.ProjectUser")
     @patch("user_management.tasks.logger")
@@ -116,15 +130,23 @@ class RemoveAllUsersFromProjectGroupsTests(TestCase):
     @patch("user_management.tasks.Project")
     def test_success(self, mock_project, mock_collect_other_project_user_groups, mock_remove_user_from_group_set):
         self.project.status.name = "Archived"
-        self.project.get_attribute_list = lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        self.project.get_attribute_list = (
+            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        )
         mock_project.objects.get.return_value = self.project
         mock_collect_other_project_user_groups.return_value = set()
         remove_all_project_users_from_groups(self.project.pk)
         self.assertEqual(mock_collect_other_project_user_groups.call_count, 4)  # 3 users + 1 PI
         self.assertEqual(mock_remove_user_from_group_set.call_count, 4)
-        mock_remove_user_from_group_set.assert_any_call("user1", {"group1", "group2"}, error_callback=set_project_user_status_to_pending)
-        mock_remove_user_from_group_set.assert_any_call("user2", {"group1", "group2"}, error_callback=set_project_user_status_to_pending)
-        mock_remove_user_from_group_set.assert_any_call("user3", {"group1", "group2"}, error_callback=set_project_user_status_to_pending)
+        mock_remove_user_from_group_set.assert_any_call(
+            "user1", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+        )
+        mock_remove_user_from_group_set.assert_any_call(
+            "user2", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+        )
+        mock_remove_user_from_group_set.assert_any_call(
+            "user3", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+        )
         mock_remove_user_from_group_set.assert_any_call("piuser", {"group1", "group2"})
 
     @patch("user_management.tasks.Project")
@@ -147,12 +169,18 @@ class RemoveAllUsersFromProjectGroupsTests(TestCase):
     @patch("user_management.utils.remove_user_from_group_set")
     @patch("user_management.utils.collect_other_project_user_groups")
     @patch("user_management.tasks.Project")
-    def test_no_groups_to_remove(self, mock_project, mock_collect_other_project_user_groups, mock_remove_user_from_group_set):
+    def test_no_groups_to_remove(
+        self, mock_project, mock_collect_other_project_user_groups, mock_remove_user_from_group_set
+    ):
         self.project.status.name = "Archived"
-        self.project.get_attribute_list = lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        self.project.get_attribute_list = (
+            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        )
         mock_project.objects.get.return_value = self.project
-        mock_collect_other_project_user_groups.return_value = {"group1", "group2"} # all users belong to both groups in other active projects
+        mock_collect_other_project_user_groups.return_value = {
+            "group1",
+            "group2",
+        }  # all users belong to both groups in other active projects
         remove_all_project_users_from_groups(self.project.pk)
         self.assertEqual(mock_collect_other_project_user_groups.call_count, 4)  # 3 users + 1 PI
         mock_remove_user_from_group_set.assert_not_called()
-    

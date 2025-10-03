@@ -1,12 +1,11 @@
-
 class UserManagementClient:
     def __init__(self):
         self.groups = {}
 
     @staticmethod
     def get_config():
-        return {}   
-    
+        return {}
+
     @staticmethod
     def test_config():
         pass
@@ -30,7 +29,7 @@ class UserManagementClient:
 
     def group_exists(self, group):
         return group in self.groups.keys()
-    
+
     def get_group_members(self, group):
         if group in self.groups:
             return list(self.groups[group])
@@ -41,4 +40,3 @@ class UserManagementClient:
             return False
         self.groups[group] = set()
         return True
-    

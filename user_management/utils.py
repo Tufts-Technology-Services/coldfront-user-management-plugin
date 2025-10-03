@@ -2,9 +2,10 @@ import importlib.util
 import logging
 import sys
 
-from django.conf import settings
 from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice
+from django.conf import settings
+
 from user_management.user_management_client import UserManagementClient
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ class GroupDoesNotExistError(Exception):
 
 
 def set_project_user_status_to_pending(project_user_pk):
-    """ Sets the status of the project user to 'Pending'.
+    """Sets the status of the project user to 'Pending'.
     This is used when there is an error adding the user to a group. We want to
     set the status to 'Pending' so that we can retry adding the user to the group
     and to ensure that the user is not considered 'Active' in Coldfront, where
@@ -109,7 +110,9 @@ def collect_other_allocation_user_groups(user, group_attribute_name, current_all
             allocationuser__status__name="Active",
             status__name="Active",
             allocationattribute__allocation_attribute_type__name=group_attribute_name,
-        ).exclude(pk=current_allocation_id).distinct()
+        )
+        .exclude(pk=current_allocation_id)
+        .distinct()
     )
 
     other_groups = []
@@ -125,7 +128,9 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
             projectuser__status__name="Active",
             status__name="Active",
             projectattribute__project_attribute_type__name=group_attribute_name,
-        ).exclude(pk=current_project_id).distinct()
+        )
+        .exclude(pk=current_project_id)
+        .distinct()
     )
 
     other_groups = []
@@ -145,7 +150,8 @@ def _get_client_module():
     spec.loader.exec_module(module)
     return module
 
+
 def get_client():
-    """ Returns an instance of the UserManagementClient as specified in settings."""
+    """Returns an instance of the UserManagementClient as specified in settings."""
     client_module = _get_client_module()
     return client_module.UserManagementClient()

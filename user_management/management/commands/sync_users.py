@@ -1,12 +1,12 @@
 import logging
 
-from django.conf import settings
-from django.core.management.base import BaseCommand
-from django.contrib.auth.models import User
-from django_auth_ldap.backend import LDAPBackend
 from coldfront.core.allocation.models import Allocation, AllocationUser
 from coldfront.core.project.models import Project, ProjectUser
 from coldfront.plugins.user_management import utils
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.core.management.base import BaseCommand
+from django_auth_ldap.backend import LDAPBackend
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +18,14 @@ class Command(BaseCommand):
         parser.add_argument("-t", "--sync-to", help="Sync changes to external system", action="store_true")
         parser.add_argument("-u", "--username", help="Check specific username")
         parser.add_argument("-g", "--group", help="Check specific group")
-        parser.add_argument("-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true")
+        parser.add_argument(
+            "-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true"
+        )
         parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
-        parser.add_argument("-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2)
+        parser.add_argument(
+            "-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2
+        )
 
     def set_verbosity(self, level):
         """Set the logging verbosity level."""
@@ -40,17 +44,21 @@ class Command(BaseCommand):
         coldfront_project_users = []
         # get project users mapped to groups and projects
         projects_with_groups = Project.objects.filter(
-            status__name="Active",
-            projectattribute__project_attribute_type__name=group_attribute_name
-            ).distinct()
+            status__name="Active", projectattribute__project_attribute_type__name=group_attribute_name
+        ).distinct()
         logger.info("Found %d projects with groups.", projects_with_groups.count())
         for project in projects_with_groups:
             logger.info("Processing project %s (ID: %s)...", project.title, project.pk)
             project_info = {"project": project.title, "project_id": project.pk, "groups": [], "users": []}
-                # get groups from project attributes
+            # get groups from project attributes
             groups = set(project.get_attribute_list(group_attribute_name))
             if group_specified and group_specified not in groups:
-                logger.debug("  Skipping project %s due to group filter. Group '%s' not in project groups %s.", project.title, group_specified, groups)
+                logger.debug(
+                    "  Skipping project %s due to group filter. Group '%s' not in project groups %s.",
+                    project.title,
+                    group_specified,
+                    groups,
+                )
                 continue
             if len(groups) == 0:
                 logger.debug("    Project %s does not have any groups. Nothing to add or remove.", project.title)
@@ -59,29 +67,38 @@ class Command(BaseCommand):
             project_info["groups"] = list(groups)
 
             # get active project users
-            project_users = ProjectUser.objects.filter(project=project, status__name="Active").select_related('user')
-            project_info["users"] = list(project_users.values_list('user__username', flat=True))
+            project_users = ProjectUser.objects.filter(project=project, status__name="Active").select_related("user")
+            project_info["users"] = list(project_users.values_list("user__username", flat=True))
 
             logger.debug("  Project PI: %s (ID: %s)", project.pi.username, project.pi.pk)
             project_info["users"].append(project.pi.username)
             coldfront_project_users.append(project_info)
             return coldfront_project_users
-    
+
     def collate_allocation_user_data(self, group_attribute_name, group_specified=None):
         coldfront_allocation_users = []
         # get project users mapped to groups and projects
         allocations_with_groups = Allocation.objects.filter(
-            status__name="Active",
-            allocationattribute__allocation_attribute_type__name=group_attribute_name
-            ).distinct()
+            status__name="Active", allocationattribute__allocation_attribute_type__name=group_attribute_name
+        ).distinct()
         logger.info("Found %d allocations with groups.", allocations_with_groups.count())
         for allocation in allocations_with_groups:
             logger.info("Processing allocation %s (ID: %s)...", allocation.title, allocation.pk)
-            allocation_info = {"allocation": allocation.title, "allocation_id": allocation.pk, "groups": [], "users": []}
-                # get groups from project attributes
+            allocation_info = {
+                "allocation": allocation.title,
+                "allocation_id": allocation.pk,
+                "groups": [],
+                "users": [],
+            }
+            # get groups from project attributes
             groups = set(allocation.get_attribute_list(group_attribute_name))
             if group_specified and group_specified not in groups:
-                logger.debug("  Skipping allocation %s due to group filter. Group '%s' not in allocation groups %s.", allocation.name, group_specified, groups)
+                logger.debug(
+                    "  Skipping allocation %s due to group filter. Group '%s' not in allocation groups %s.",
+                    allocation.name,
+                    group_specified,
+                    groups,
+                )
                 continue
             if len(groups) == 0:
                 logger.debug("    Allocation %s does not have any groups. Nothing to add or remove.", allocation.name)
@@ -90,8 +107,10 @@ class Command(BaseCommand):
             allocation_info["groups"] = list(groups)
 
             # get active project users
-            allocation_users = AllocationUser.objects.filter(allocation=allocation, status__name="Active").select_related('user')
-            allocation_info["users"] = list(allocation_users.values_list('user__username', flat=True))
+            allocation_users = AllocationUser.objects.filter(
+                allocation=allocation, status__name="Active"
+            ).select_related("user")
+            allocation_info["users"] = list(allocation_users.values_list("user__username", flat=True))
 
             coldfront_allocation_users.append(allocation_info)
             return coldfront_allocation_users
@@ -111,27 +130,33 @@ class Command(BaseCommand):
 
     def compare_coldfront_to_external(self, coldfront_users_and_groups, external_users_and_groups):
         differences = []
-        external_group_dict = {g['group']: set(g['members']) for g in external_users_and_groups}
+        external_group_dict = {g["group"]: set(g["members"]) for g in external_users_and_groups}
         for entry in coldfront_users_and_groups:
             alignment = "project" if "project" in entry else "allocation"
-            groups = entry['groups']
-            users = set(entry['users'])
+            groups = entry["groups"]
+            users = set(entry["users"])
             for group in groups:
                 external_members = external_group_dict.get(group, set())
                 missing_from_external = users - external_members
                 missing_from_coldfront = external_members - users
                 if missing_from_external or missing_from_coldfront:
-                    differences.append({
-                        alignment: entry[alignment],
-                        f"{alignment}_id": entry[f"{alignment}_id"],
-                        "group": group,
-                        "missing_from_external": list(missing_from_external),
-                        "missing_from_coldfront": list(missing_from_coldfront),
-                    })
-                    logger.debug("Group %s: %d users to add, %d users to remove.", 
-                                group, len(missing_from_external), len(missing_from_coldfront))
+                    differences.append(
+                        {
+                            alignment: entry[alignment],
+                            f"{alignment}_id": entry[f"{alignment}_id"],
+                            "group": group,
+                            "missing_from_external": list(missing_from_external),
+                            "missing_from_coldfront": list(missing_from_coldfront),
+                        }
+                    )
+                    logger.debug(
+                        "Group %s: %d users to add, %d users to remove.",
+                        group,
+                        len(missing_from_external),
+                        len(missing_from_coldfront),
+                    )
         return differences
-    
+
     def handle(self, *args, **options):
         self.set_verbosity(options["verbosity"])
 
@@ -155,22 +180,19 @@ class Command(BaseCommand):
         group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
         if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
             logger.info("Managing groups at the project level...")
-            coldfront_users_and_groups = self.collate_project_user_data(group_attribute_name, 
-                                                                        group_specified)
+            coldfront_users_and_groups = self.collate_project_user_data(group_attribute_name, group_specified)
 
         else:
             logger.info("Managing groups at the allocation level...")
             # get allocation users mapped to groups and allocations
-            coldfront_users_and_groups = self.collate_allocation_user_data(group_attribute_name, 
-                                                                          group_specified)
+            coldfront_users_and_groups = self.collate_allocation_user_data(group_attribute_name, group_specified)
 
-        group_set = set([n for sub in coldfront_users_and_groups for n in sub['groups']])
+        group_set = set([n for sub in coldfront_users_and_groups for n in sub["groups"]])
         # query external system for members of each group
         external_users_and_groups = self.collate_external_user_data(group_set)
-        
+
         # compare coldfront to external system and determine adds/removes
-        differences = self.compare_coldfront_to_external(coldfront_users_and_groups, 
-                                                          external_users_and_groups)
+        differences = self.compare_coldfront_to_external(coldfront_users_and_groups, external_users_and_groups)
 
         if not dry_run:
             if sync_to:
@@ -185,7 +207,7 @@ class Command(BaseCommand):
                             continue
                         logger.info("Adding user %s to group %s...", user, diff["group"])
                         try:
-                            client.add_user_to_group(user, diff["group"])   
+                            client.add_user_to_group(user, diff["group"])
                         except IOError as e:
                             logger.error("Failed to add user %s to group %s: %s", user, diff["group"], e)
                     for user in diff["missing_from_coldfront"]:
@@ -219,7 +241,7 @@ class Command(BaseCommand):
                                     # populate user details from LDAP
                                     LDAPBackend().populate_user_from_ldap(user)
 
-                                pu = ProjectUser(project=p, user=user_obj, status='Active')
+                                pu = ProjectUser(project=p, user=user_obj, status="Active")
                                 pu.save()
                             except Exception as e:
                                 logger.error("Failed to add user %s to project %s: %s", user, diff["project"], e)
@@ -234,7 +256,7 @@ class Command(BaseCommand):
                                 # remove the user from the Project
                                 for pu in project_users:
                                     if pu.user.username == user:
-                                        pu.status = 'Removed'
+                                        pu.status = "Removed"
                                         pu.save()
                             except Exception as e:
                                 logger.error("Failed to remove user %s from project %s: %s", user, diff["project"], e)
@@ -254,7 +276,7 @@ class Command(BaseCommand):
                                     # populate user details from LDAP
                                     LDAPBackend().populate_user_from_ldap(user)
 
-                                au = AllocationUser(allocation=a, user=user_obj, status='Active')
+                                au = AllocationUser(allocation=a, user=user_obj, status="Active")
                                 au.save()
                             except Exception as e:
                                 logger.error("Failed to add user %s to allocation %s: %s", user, diff["allocation"], e)
@@ -268,10 +290,12 @@ class Command(BaseCommand):
                                 # remove the user from the Allocation
                                 for au in allocation_users:
                                     if au.user.username == user:
-                                        au.status = 'Removed'
+                                        au.status = "Removed"
                                         au.save()
                             except Exception as e:
-                                logger.error("Failed to remove user %s from allocation %s: %s", user, diff["allocation"], e)
+                                logger.error(
+                                    "Failed to remove user %s from allocation %s: %s", user, diff["allocation"], e
+                                )
             logger.info("Sync complete.")
         else:
             logger.info("Dry run complete. No changes were made.")

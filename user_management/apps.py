@@ -6,17 +6,19 @@ import logging
 from django.apps import AppConfig
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
 from user_management.signals import init_signal_receivers
-from user_management.utils import _get_client_module
 from user_management.user_management_client import UserManagementClient
+from user_management.utils import _get_client_module
 
 logger = logging.getLogger(__name__)
+
 
 class UserManagementConfig(AppConfig):
     """
     Configuration for the user management plugin.
     This class initializes signal receivers based on settings and tests the user management client configuration."""
-    
+
     name = "coldfront.plugins.user_management"
 
     def ready(self):
@@ -25,13 +27,19 @@ class UserManagementConfig(AppConfig):
         logger.debug("Testing UserManagementClient configuration...")
         _get_client_module().UserManagementClient.test_config()
         if not isinstance(_get_client_module().UserManagementClient, UserManagementClient):
-            raise ImproperlyConfigured("UserManagementClient implementation does not conform to the UserManagementClient protocol.")
+            raise ImproperlyConfigured(
+                "UserManagementClient implementation does not conform to the UserManagementClient protocol."
+            )
         if settings.USER_MANAGEMENT_ENABLE_SIGNALS:
             logger.info("Initializing User Management Plugin signal receivers...")
             # default is to manage group membership at the allocation level
-            init_signal_receivers(settings.MANAGE_GROUPS_AT_PROJECT_LEVEL, settings.USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE)
+            init_signal_receivers(
+                settings.MANAGE_GROUPS_AT_PROJECT_LEVEL, settings.USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE
+            )
         else:
-            logger.warning("User Management Plugin signal receivers are disabled. No users will be added or removed from groups automatically.")
+            logger.warning(
+                "User Management Plugin signal receivers are disabled. No users will be added or removed from groups automatically."
+            )
 
     @staticmethod
     def validate_settings():
@@ -49,15 +57,14 @@ class UserManagementConfig(AppConfig):
             "UNIX_GROUP_ATTRIBUTE_NAME",
             "USER_MANAGEMENT_CLIENT_PATH",
         ]
-        for s in (bool_plugin_settings + string_plugin_settings):
+        for s in bool_plugin_settings + string_plugin_settings:
             if not hasattr(settings, s):
                 raise ImproperlyConfigured(f"{s} must be defined.")
-        
+
         for b in bool_plugin_settings:
             if not isinstance(getattr(settings, b), bool):
                 raise ImproperlyConfigured(f"{b} must be a boolean.")
-        
+
         for st in string_plugin_settings:
             if not isinstance(getattr(settings, st), str) and getattr(settings, st) is not None:
                 raise ImproperlyConfigured(f"{st} must be a string or None.")
- 

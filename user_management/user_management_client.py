@@ -15,6 +15,7 @@ class UserManagementClient(Protocol):
     7. get_group_members: Retrieve the members of a specified group.
     8. create_group: Create a new group.
     """
+
     @staticmethod
     def get_config() -> dict: ...
 

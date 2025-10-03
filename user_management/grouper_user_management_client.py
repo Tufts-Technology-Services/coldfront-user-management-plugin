@@ -11,6 +11,7 @@ class UserManagementClient:
     """
     Implements Coldfront UserManagementClientInterface using Grouper.
     """
+
     def __init__(self):
         try:
             grouper_client = importlib.import_module("grouper_client")
@@ -27,9 +28,9 @@ class UserManagementClient:
             "api_url": settings.GROUPER_API_URL,
             "entity_id": settings.GROUPER_ENTITY_ID,
             "key_path": settings.GROUPER_KEY_PATH,
-            "group_stem": settings.GROUPER_GROUP_STEM
+            "group_stem": settings.GROUPER_GROUP_STEM,
         }
-    
+
     @staticmethod
     def test_config():
         """
@@ -43,7 +44,7 @@ class UserManagementClient:
         config = UserManagementClient.get_config()
         if not config["api_url"] or not config["entity_id"] or not config["key_path"] or not config["group_stem"]:
             raise ImproperlyConfigured("Grouper client is not properly configured. Please check your settings.")
-        
+
     def add_user_to_group(self, user, group):
         try:
             r = self.client.add_member_to_group(group, user)
