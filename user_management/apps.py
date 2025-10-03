@@ -50,8 +50,7 @@ class UserManagementConfig(AppConfig):
         bool_plugin_settings = [
             "USER_MANAGEMENT_ENABLE_SIGNALS",
             "MANAGE_GROUPS_AT_PROJECT_LEVEL",
-            "USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE",
-            "USER_MANAGEMENT_CLIENT_PATH",
+            "USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE"
         ]
         string_plugin_settings = [
             "UNIX_GROUP_ATTRIBUTE_NAME",

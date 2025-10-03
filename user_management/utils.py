@@ -143,7 +143,7 @@ def _get_client_module():
     if "user_management_client" in sys.modules:
         return sys.modules["user_management_client"].UserManagementClient()
 
-    path = settings.USER_MANAGEMENT_CLIENT_PATH or "coldfront/plugins/user_management/grouper_user_management_client.py"
+    path = settings.USER_MANAGEMENT_CLIENT_PATH or "user_management/grouper_user_management_client.py"
     spec = importlib.util.spec_from_file_location("UserManagementClient", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules["user_management_client"] = module
