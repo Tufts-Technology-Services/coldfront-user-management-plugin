@@ -18,7 +18,7 @@ class UserManagementConfig(AppConfig):
     Configuration for the user management plugin.
     This class initializes signal receivers based on settings and tests the user management client configuration."""
 
-    name = "coldfront.plugins.user_management"
+    name = "user_management"
 
     def ready(self):
         #UserManagementConfig.validate_settings()
