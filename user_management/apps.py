@@ -7,8 +7,8 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-#from user_management.user_management_client import UserManagementClient
-#from user_management.utils import _get_client_module
+from user_management.user_management_client import UserManagementClient
+from user_management.utils import _get_client_module
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +24,12 @@ class UserManagementConfig(AppConfig):
         #UserManagementConfig.validate_settings()
         # tests whether the client has the appropriate configuration and any dependencies can be imported
         logger.debug("Testing UserManagementClient configuration...")
-        #_get_client_module().UserManagementClient.test_config()
-        #if not isinstance(_get_client_module().UserManagementClient, UserManagementClient):
-        #    raise ImproperlyConfigured(
-        #        "UserManagementClient implementation does not conform to the UserManagementClient protocol."
-        #    )
+        _get_client_module().UserManagementClient.test_config()
+        if not isinstance(_get_client_module().UserManagementClient, UserManagementClient):
+            raise ImproperlyConfigured(
+                "UserManagementClient implementation does not conform to the UserManagementClient protocol."
+            )
+
         if settings.USER_MANAGEMENT_ENABLE_SIGNALS:
             logger.info("Initializing User Management Plugin signal receivers...")
             # pylint: disable=import-outside-toplevel
