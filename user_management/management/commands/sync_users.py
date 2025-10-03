@@ -2,7 +2,7 @@ import logging
 
 from coldfront.core.allocation.models import Allocation, AllocationUser
 from coldfront.core.project.models import Project, ProjectUser
-from coldfront.plugins.user_management import utils
+user_management import utils
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand

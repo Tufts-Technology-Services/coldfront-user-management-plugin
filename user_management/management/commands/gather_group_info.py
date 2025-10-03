@@ -25,7 +25,9 @@ class Command(BaseCommand):
         parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
         parser.add_argument(
-            "-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2
+            "-v", "--verbosity", 
+            help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)",
+            default=2
         )
 
     @staticmethod
