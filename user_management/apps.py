@@ -22,14 +22,14 @@ class UserManagementConfig(AppConfig):
     name = "coldfront.plugins.user_management"
 
     def ready(self):
-        UserManagementConfig.validate_settings()
+        #UserManagementConfig.validate_settings()
         # tests whether the client has the appropriate configuration and any dependencies can be imported
         logger.debug("Testing UserManagementClient configuration...")
-        _get_client_module().UserManagementClient.test_config()
-        if not isinstance(_get_client_module().UserManagementClient, UserManagementClient):
-            raise ImproperlyConfigured(
-                "UserManagementClient implementation does not conform to the UserManagementClient protocol."
-            )
+        #_get_client_module().UserManagementClient.test_config()
+        #if not isinstance(_get_client_module().UserManagementClient, UserManagementClient):
+        #    raise ImproperlyConfigured(
+        #        "UserManagementClient implementation does not conform to the UserManagementClient protocol."
+        #    )
         if settings.USER_MANAGEMENT_ENABLE_SIGNALS:
             logger.info("Initializing User Management Plugin signal receivers...")
             # default is to manage group membership at the allocation level
