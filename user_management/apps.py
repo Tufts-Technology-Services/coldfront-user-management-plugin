@@ -7,9 +7,8 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from user_management.signals import init_signal_receivers
-from user_management.user_management_client import UserManagementClient
-from user_management.utils import _get_client_module
+#from user_management.user_management_client import UserManagementClient
+#from user_management.utils import _get_client_module
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +31,8 @@ class UserManagementConfig(AppConfig):
         #    )
         if settings.USER_MANAGEMENT_ENABLE_SIGNALS:
             logger.info("Initializing User Management Plugin signal receivers...")
+            # pylint: disable=import-outside-toplevel
+            from user_management.signals import init_signal_receivers
             # default is to manage group membership at the allocation level
             init_signal_receivers(
                 settings.MANAGE_GROUPS_AT_PROJECT_LEVEL, settings.USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE
