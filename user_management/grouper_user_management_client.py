@@ -1,5 +1,6 @@
 import importlib
 import logging
+import os
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -25,10 +26,10 @@ class UserManagementClient:
         Retrieves the configuration for the Grouper client from Django settings.
         """
         return {
-            "api_url": settings.GROUPER_API_URL,
-            "entity_id": settings.GROUPER_ENTITY_ID,
-            "key_path": settings.GROUPER_KEY_PATH,
-            "group_stem": settings.GROUPER_GROUP_STEM,
+            "api_url": os.getenv("GROUPER_API_URL"),
+            "entity_id": os.getenv("GROUPER_ENTITY_ID"),
+            "key_path": os.getenv("GROUPER_KEY_PATH"),
+            "group_stem": os.getenv("GROUPER_GROUP_STEM"),
         }
 
     @staticmethod
