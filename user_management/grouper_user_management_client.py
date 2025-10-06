@@ -2,9 +2,6 @@ import importlib
 import logging
 import os
 
-from django.conf import settings
-from django.core.exceptions import ImproperlyConfigured
-
 logger = logging.getLogger(__name__)
 
 
@@ -18,12 +15,12 @@ class UserManagementClient:
             grouper_client = importlib.import_module("grouper_client")
             self.client = grouper_client.GrouperClient(*self.get_config().values())
         except Exception as e:
-            raise ImproperlyConfigured("Grouper client library is not installed. Please install it.") from e
+            raise ImportError("Grouper client library is not installed. Please install it.") from e
 
     @staticmethod
     def get_config():
         """
-        Retrieves the configuration for the Grouper client from Django settings.
+        Retrieves the configuration for the Grouper client from environment variables.
         """
         return {
             "api_url": os.getenv("GROUPER_API_URL"),
@@ -41,10 +38,10 @@ class UserManagementClient:
         try:
             _ = importlib.import_module("grouper_client")
         except Exception as e:
-            raise ImproperlyConfigured("Grouper client library is not installed. Please install it.") from e
+            raise ImportError("Grouper client library is not installed. Please install it.") from e
         config = UserManagementClient.get_config()
         if not config["api_url"] or not config["entity_id"] or not config["key_path"] or not config["group_stem"]:
-            raise ImproperlyConfigured("Grouper client is not properly configured. Please check your settings.")
+            raise ValueError("Grouper client is not properly configured. Please check your environment variables.")
 
     def add_user_to_group(self, user, group):
         try:

@@ -26,7 +26,7 @@ class UserManagementConfig(AppConfig):
         # pylint: disable=import-outside-toplevel
         from user_management.utils import _get_client_module
         _get_client_module().UserManagementClient.test_config()
-        if not isinstance(_get_client_module().UserManagementClient, UserManagementClient):
+        if not issubclass(_get_client_module().UserManagementClient, UserManagementClient):
             raise ImproperlyConfigured(
                 "UserManagementClient implementation does not conform to the UserManagementClient protocol."
             )
