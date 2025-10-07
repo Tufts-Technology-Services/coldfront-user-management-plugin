@@ -31,9 +31,6 @@ class Command(BaseCommand):
         parser.add_argument(
             "-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true"
         )
-        parser.add_argument(
-            "-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2
-        )
 
     def set_verbosity(self, level):
         """Set the logging verbosity level."""
