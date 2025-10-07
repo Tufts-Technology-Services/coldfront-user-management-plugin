@@ -7,8 +7,6 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from user_management.user_management_client import UserManagementClient
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,21 +18,19 @@ class UserManagementConfig(AppConfig):
     name = "user_management"
 
     def ready(self):
-        #UserManagementConfig.validate_settings()
+        UserManagementConfig.validate_settings()
         # tests whether the client has the appropriate configuration and any dependencies can be imported
         logger.debug("Testing UserManagementClient configuration...")
         # pylint: disable=import-outside-toplevel
-        from user_management.utils import _get_client_module
-        _get_client_module().UserManagementClient.test_config()
-        if not issubclass(_get_client_module().UserManagementClient, UserManagementClient):
-            raise ImproperlyConfigured(
-                "UserManagementClient implementation does not conform to the UserManagementClient protocol."
-            )
+        from user_management.utils import get_client_class
+
+        get_client_class().test_config()
 
         if settings.USER_MANAGEMENT_ENABLE_SIGNALS:
             logger.info("Initializing User Management Plugin signal receivers...")
             # pylint: disable=import-outside-toplevel
             from user_management.signals import init_signal_receivers
+
             # default is to manage group membership at the allocation level
             init_signal_receivers(
                 settings.MANAGE_GROUPS_AT_PROJECT_LEVEL, settings.USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE
@@ -53,7 +49,7 @@ class UserManagementConfig(AppConfig):
         bool_plugin_settings = [
             "USER_MANAGEMENT_ENABLE_SIGNALS",
             "MANAGE_GROUPS_AT_PROJECT_LEVEL",
-            "USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE"
+            "USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE",
         ]
         string_plugin_settings = [
             "UNIX_GROUP_ATTRIBUTE_NAME",

@@ -2,11 +2,12 @@ import logging
 
 from coldfront.core.allocation.models import Allocation, AllocationUser
 from coldfront.core.project.models import Project, ProjectUser
-user_management import utils
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django_auth_ldap.backend import LDAPBackend
+
+from user_management import utils
 
 logger = logging.getLogger(__name__)
 
