@@ -24,22 +24,6 @@ class Command(BaseCommand):
         )
         parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
-        parser.add_argument(
-            "-v", "--verbosity", help="Set the verbosity level (0=ERROR, 1=WARNING, 2=INFO, 3=DEBUG)", default=2
-        )
-
-    def set_verbosity(self, level):
-        """Set the logging verbosity level."""
-        level = int(level)
-        root_logger = logging.getLogger("")
-        if level == 0:
-            root_logger.setLevel(logging.ERROR)
-        elif level == 2:
-            root_logger.setLevel(logging.INFO)
-        elif level == 3:
-            root_logger.setLevel(logging.DEBUG)
-        else:
-            root_logger.setLevel(logging.WARNING)
 
     def collate_project_user_data(self, group_attribute_name, group_specified=None):
         coldfront_project_users = []
@@ -159,8 +143,6 @@ class Command(BaseCommand):
         return differences
 
     def handle(self, *args, **options):
-        self.set_verbosity(options["verbosity"])
-
         username_specified = options.get("username", None)
         group_specified = options.get("group", None)
         dry_run = options.get("dry_run", False)
