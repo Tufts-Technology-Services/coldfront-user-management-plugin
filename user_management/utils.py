@@ -38,9 +38,9 @@ def set_project_user_status_to_pending(project_user_pk):
     user_obj.save()
 
 
-def get_project_attribute_values_list(project, attribute_name):
-    attr = project.projectattribute_set.filter(project_attribute_type__name=attribute_name).all()
-    return [a.value for a in attr]
+def get_project_attribute_values_set(project, attribute_name):
+    attr = project.projectattribute_set.filter(proj_attr_type__name=attribute_name).all()
+    return set(a.value for a in attr)
 
 
 def _add_user_to_group(user: str, group: str, client: UserManagementClient) -> None:
@@ -129,7 +129,7 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
             projectuser__user=user,
             projectuser__status__name="Active",
             status__name="Active",
-            projectattribute__project_attribute_type__name=group_attribute_name,
+            projectattribute__proj_attr_type__name=group_attribute_name,
         )
         .exclude(pk=current_project_id)
         .distinct()
@@ -137,7 +137,7 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
 
     other_groups = []
     for p in other_user_projects:
-        other_groups.extend(get_project_attribute_values_list(p, group_attribute_name))
+        other_groups.extend(get_project_attribute_values_set(p, group_attribute_name))
     return set(other_groups)
 
 
