@@ -32,19 +32,6 @@ class Command(BaseCommand):
             "-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true"
         )
 
-    def set_verbosity(self, level):
-        """Set the logging verbosity level."""
-        level = int(level)
-        root_logger = logging.getLogger("")
-        if level == 0:
-            root_logger.setLevel(logging.ERROR)
-        elif level == 2:
-            root_logger.setLevel(logging.INFO)
-        elif level == 3:
-            root_logger.setLevel(logging.DEBUG)
-        else:
-            root_logger.setLevel(logging.WARNING)
-
     def process_csv_input_file(self, input_file):
         """
         Process the input file and return a dictionary of group mappings.
@@ -343,8 +330,6 @@ class Command(BaseCommand):
                 logger.info("Wrote differences to output file %s.", output_file)
 
     def handle(self, *args, **options):
-        self.set_verbosity(options["verbosity"])
-
         dry_run = options.get("dry_run", False)
         if dry_run:
             logger.info("Dry run mode enabled. No changes will be made.")

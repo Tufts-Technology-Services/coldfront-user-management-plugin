@@ -26,20 +26,6 @@ class Command(BaseCommand):
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
 
     @staticmethod
-    def set_verbosity(level):
-        """Set the logging verbosity level."""
-        level = int(level)
-        root_logger = logging.getLogger("")
-        if level == 0:
-            root_logger.setLevel(logging.ERROR)
-        elif level == 2:
-            root_logger.setLevel(logging.INFO)
-        elif level == 3:
-            root_logger.setLevel(logging.DEBUG)
-        else:
-            root_logger.setLevel(logging.WARNING)
-
-    @staticmethod
     def parse_alignment(alignment):
         default_alignment = "project" if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL else "allocation"
         if alignment not in ["project", "allocation", None]:
@@ -138,8 +124,6 @@ class Command(BaseCommand):
         return info
 
     def handle(self, *args, **options):
-        self.set_verbosity(options["verbosity"])
-
         output_file = options.get("output_file")
         if not output_file:
             logger.error("Output file is required.")
