@@ -64,7 +64,7 @@ class Command(BaseCommand):
         logger.info("Found %d active projects.", projects.count())
         for project in projects:
             # check if the current project has the group attribute defined
-            project_attributes = project.projectattribute_set.filter(project_attribute_type__name=group_attribute_name)
+            project_attributes = project.projectattribute_set.filter(proj_attr_type__name=group_attribute_name)
             if project_attributes.exists():
                 logger.info("  Project %s has group attribute defined.", project.title)
                 info.append(
@@ -97,12 +97,12 @@ class Command(BaseCommand):
                 allocation_attribute_type__name=group_attribute_name
             )
             if allocation_attributes.exists():
-                logger.info("  Allocation %s has group attribute defined.", allocation.project.title)
+                logger.info("  Allocation %s:%s has group attribute defined.", allocation.project.title, allocation.resources.first().name)
                 info.append(
                     {
                         "project": allocation.project.title,
                         "project_pi": allocation.pi.username,
-                        "allocation": allocation.resource.name,
+                        "allocation": allocation.resources.first().name,
                         "allocation_id": allocation.pk,
                         "group": allocation_attributes.first().value,  # assuming only one attribute of this type per allocation
                     }
@@ -110,13 +110,13 @@ class Command(BaseCommand):
 
             else:
                 logger.info(
-                    "  Allocation %s(%s) does not have group attribute defined.", allocation.name, allocation.pk
+                    "  Allocation %s(%s) does not have group attribute defined.", allocation.resources.first().name, allocation.pk
                 )
                 info.append(
                     {
                         "project": allocation.project.title,
                         "project_pi": allocation.pi.username,
-                        "allocation": allocation.resource.name,
+                        "allocation": allocation.resources.first().name,
                         "allocation_id": allocation.pk,
                         "group": "",
                     }

@@ -29,7 +29,7 @@ class Command(BaseCommand):
         coldfront_project_users = []
         # get project users mapped to groups and projects
         projects_with_groups = Project.objects.filter(
-            status__name="Active", projectattribute__project_attribute_type__name=group_attribute_name
+            status__name="Active", projectattribute__proj_attr_type__name=group_attribute_name
         ).distinct()
         logger.info("Found %d projects with groups.", projects_with_groups.count())
         for project in projects_with_groups:
@@ -68,9 +68,9 @@ class Command(BaseCommand):
         ).distinct()
         logger.info("Found %d allocations with groups.", allocations_with_groups.count())
         for allocation in allocations_with_groups:
-            logger.info("Processing allocation %s (ID: %s)...", allocation.title, allocation.pk)
+            logger.info("Processing allocation %s (ID: %s)...", allocation.resources.first().name, allocation.pk)
             allocation_info = {
-                "allocation": allocation.title,
+                "allocation": allocation.resources.first().name,
                 "allocation_id": allocation.pk,
                 "groups": [],
                 "users": [],
@@ -79,14 +79,16 @@ class Command(BaseCommand):
             groups = set(allocation.get_attribute_list(group_attribute_name))
             if group_specified and group_specified not in groups:
                 logger.debug(
-                    "  Skipping allocation %s due to group filter. Group '%s' not in allocation groups %s.",
-                    allocation.name,
+                    "  Skipping allocation %s(%s) due to group filter. Group '%s' not in allocation groups %s.",
+                    allocation.resources.first().name,
+                    allocation.pk,
                     group_specified,
                     groups,
                 )
                 continue
             if len(groups) == 0:
-                logger.debug("    Allocation %s does not have any groups. Nothing to add or remove.", allocation.name)
+                logger.debug("    Allocation %s(%s) does not have any groups. Nothing to add or remove.", 
+                             allocation.resources.first().name, allocation.pk)
                 continue
             logger.debug("    Groups from project attribute '%s': %s", group_attribute_name, groups)
             allocation_info["groups"] = list(groups)

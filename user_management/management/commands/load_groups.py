@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 continue
 
             # check if the current project has the group attribute defined
-            project_attributes = project.projectattribute_set.filter(project_attribute_type=project_attribute_type)
+            project_attributes = project.projectattribute_set.filter(proj_attr_type=project_attribute_type)
             # todo: check if the AttributeType name is a unique value
             if project_attributes.exists():
                 logger.info("  Project %s has group attribute defined.", project.title)
@@ -143,7 +143,7 @@ class Command(BaseCommand):
                 if not dry_run:
                     # create the ProjectAttribute with the value from passed argument
                     pa = project_models.ProjectAttribute(
-                        project=project, project_attribute_type=project_attribute_type, value=group_for_project
+                        project=project, proj_attr_type=project_attribute_type, value=group_for_project
                     )
                     pa.save()
                     logger.info(
@@ -200,7 +200,7 @@ class Command(BaseCommand):
                     self.differences["skipped"].append(
                         {
                             "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
-                            "allocation": allocation.resource.name,
+                            "allocation": allocation.resources.first().name,
                             "allocation_id": allocation.pk,
                             "group": group_for_allocation,
                             "new_group": group_for_allocation,
@@ -218,7 +218,7 @@ class Command(BaseCommand):
                     self.differences["updated"].append(
                         {
                             "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
-                            "allocation": allocation.resource.name,
+                            "allocation": allocation.resources.first().name,
                             "allocation_id": allocation.pk,
                             "group": allocation_attributes.first().value,
                             "new_group": group_for_allocation,
@@ -226,7 +226,7 @@ class Command(BaseCommand):
                     )
             else:
                 logger.info(
-                    "  Allocation %s(%s) does not have group attribute defined.", allocation.name, allocation.pk
+                    "  Allocation %s(%s) does not have group attribute defined.", allocation.resources.first().name, allocation.pk
                 )
                 if not dry_run:
                     # create the AllocationAttribute with the value from passed argument
@@ -245,7 +245,7 @@ class Command(BaseCommand):
                     self.differences["added"].append(
                         {
                             "mapping_key": f"{allocation.project.title}_{allocation.pi.username}".lower().strip(),
-                            "allocation": allocation.resource.name,
+                            "allocation": allocation.resources.first().name,
                             "allocation_id": allocation.pk,
                             "group": "",
                             "new_group": group_for_allocation,

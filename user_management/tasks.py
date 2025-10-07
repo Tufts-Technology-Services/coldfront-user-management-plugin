@@ -61,8 +61,8 @@ def add_project_user_to_group(user_pk):
     if project_user.status.name != "Active":
         logger.warning("Project user status is not 'Active'. Will not add user.")
         return
-
-    groups = set(project_user.project.get_attribute_list(group_attribute_name))
+    
+    groups = utils.get_project_attribute_values_set(project_user.project, group_attribute_name)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to add")
         return
@@ -142,8 +142,7 @@ def remove_project_user_from_group(user_pk):
     if project_user.status.name != "Removed":
         logger.warning("Project user status is not 'Removed'. Will not remove user from group.")
         return
-
-    groups = project_user.project.get_attribute_list(group_attribute_name)
+    groups = utils.get_project_attribute_values_set(project_user.project, group_attribute_name)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to remove")
         return
@@ -152,7 +151,7 @@ def remove_project_user_from_group(user_pk):
     other_groups = utils.collect_other_project_user_groups(
         project_user.user, group_attribute_name, project_user.project.pk
     )
-    group_diff = set(groups).difference(other_groups)
+    group_diff = groups.difference(other_groups)
 
     if len(group_diff) == 0:
         logger.info(
@@ -179,7 +178,7 @@ def remove_all_project_users_from_groups(project_pk):
         logger.warning("Project is not archived. Will not remove users from groups")
         return
 
-    groups = set(project.get_attribute_list(group_attribute_name))
+    groups = utils.get_project_attribute_values_set(project, group_attribute_name)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to remove")
         return
