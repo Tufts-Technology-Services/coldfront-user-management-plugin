@@ -1,9 +1,7 @@
 import logging
 
 from coldfront.core.allocation.signals import allocation_activate_user, allocation_remove_user
-from coldfront.core.project.signals import (project_activate_user, 
-                                            project_archive, 
-                                            project_remove_user)
+from coldfront.core.project.signals import project_activate_user, project_archive, project_remove_user
 from django_q.tasks import async_task
 
 logger = logging.getLogger(__name__)
@@ -23,9 +21,7 @@ def init_signal_receivers(project_level=False, remove_on_archive=False):
         project_activate_user.connect(
             activate_project_user, dispatch_uid="ump_activate_project_user_1"
         )  # dispatch_uid to avoid duplicate connections
-        project_remove_user.connect(
-            remove_project_user, dispatch_uid="ump_remove_project_user_1"
-        )
+        project_remove_user.connect(remove_project_user, dispatch_uid="ump_remove_project_user_1")
 
         if remove_on_archive:
             logger.warning(
@@ -36,21 +32,11 @@ def init_signal_receivers(project_level=False, remove_on_archive=False):
     else:  # allocation level
         logger.debug("Initializing allocation-level signal receivers for User Management...")
         # connect signals to allocation user management views
-        allocation_activate_user.connect(
-            activate_allocation_user, dispatch_uid="ump_activate_allocation_user_1"
-        )
-        allocation_activate_user.connect(
-            activate_allocation_user, dispatch_uid="ump_activate_allocation_user_2"
-        )
-        allocation_remove_user.connect(
-            remove_allocation_user, dispatch_uid="ump_remove_allocation_user_1"
-        )
-        allocation_remove_user.connect(
-            remove_allocation_user, dispatch_uid="ump_remove_allocation_user_2"
-        )
-        allocation_remove_user.connect(
-            remove_allocation_user, dispatch_uid="ump_remove_allocation_user_3"
-        )
+        allocation_activate_user.connect(activate_allocation_user, dispatch_uid="ump_activate_allocation_user_1")
+        allocation_activate_user.connect(activate_allocation_user, dispatch_uid="ump_activate_allocation_user_2")
+        allocation_remove_user.connect(remove_allocation_user, dispatch_uid="ump_remove_allocation_user_1")
+        allocation_remove_user.connect(remove_allocation_user, dispatch_uid="ump_remove_allocation_user_2")
+        allocation_remove_user.connect(remove_allocation_user, dispatch_uid="ump_remove_allocation_user_3")
 
         if remove_on_archive:
             logger.warning(

@@ -1,6 +1,8 @@
 import importlib.util
+import inspect
 import logging
 import sys
+from pathlib import Path
 
 from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice
@@ -140,18 +142,36 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
 
 
 def _get_client_module():
-    if "user_management_client" in sys.modules:
-        return sys.modules["user_management_client"].UserManagementClient()
+    default_path = Path(sys.modules["user_management"].__file__).parent / "grouper_user_management_client.py"
+    path = Path(settings.USER_MANAGEMENT_CLIENT_PATH) if "USER_MANAGEMENT_CLIENT_PATH" in settings else default_path
+    module_name = path.stem
 
-    path = settings.USER_MANAGEMENT_CLIENT_PATH or "user_management/grouper_user_management_client.py"
-    spec = importlib.util.spec_from_file_location("UserManagementClient", path)
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+
+    spec = importlib.util.spec_from_file_location(module_name, path.as_posix())
     module = importlib.util.module_from_spec(spec)
-    sys.modules["user_management_client"] = module
+    sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
 
-def get_client():
-    """Returns an instance of the UserManagementClient as specified in settings."""
+def get_client_class():
+    """Returns an instance of the UserManagementClient subclass as specified in settings."""
     client_module = _get_client_module()
-    return client_module.UserManagementClient()
+    classes = []
+    for _, obj in inspect.getmembers(client_module, inspect.isclass):
+        # Filter out imported classes and only include classes defined in this module
+        if obj.__module__ == client_module.__name__ and issubclass(obj, UserManagementClient):
+            classes.append(obj)
+    if len(classes) != 1:
+        raise ImportError(
+            f"Expected exactly one UserManagementClient subclass in {client_module.__name__}, found {len(classes)}"
+        )
+    return classes[0]
+
+
+def get_client() -> UserManagementClient:
+    """Returns an instance of the UserManagementClient subclass as specified in settings."""
+    client_class = get_client_class()
+    return client_class()
