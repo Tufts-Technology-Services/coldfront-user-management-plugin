@@ -18,6 +18,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("-t", "--sync-to", help="Sync changes to external system", action="store_true")
+        parser.add_argument("-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False)
         parser.add_argument("-u", "--username", help="Check specific username")
         parser.add_argument("-g", "--group", help="Check specific group")
         parser.add_argument(
@@ -27,12 +28,19 @@ class Command(BaseCommand):
         #parser.add_argument("-f", "--format", help="json or csv output", default=None)
         #parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
 
-    def collate_project_user_data(self, group_attribute_name, group_specified=None):
+    def collate_project_user_data(self, group_attribute_name, include_new, group_specified=None):
         coldfront_project_users = []
         # get project users mapped to groups and projects
-        projects_with_groups = Project.objects.filter(
-            status__name="Active", projectattribute__proj_attr_type__name=group_attribute_name
-        ).distinct()
+        projects_with_groups = None
+        if include_new:
+            projects_with_groups = Project.objects.filter(
+                status__name__in=["Active", "New"], projectattribute__proj_attr_type__name=group_attribute_name
+            ).distinct()
+        else:   
+            projects_with_groups = Project.objects.filter(
+                status__name="Active", projectattribute__proj_attr_type__name=group_attribute_name
+            ).distinct()
+
         self.stdout.write("Found %d projects with groups." % projects_with_groups.count())
         for project in projects_with_groups:
             self.stdout.write("Processing project %s (ID: %s)..." % (project.title, project.pk))
@@ -61,12 +69,18 @@ class Command(BaseCommand):
             coldfront_project_users.append(project_info)
             return coldfront_project_users
 
-    def collate_allocation_user_data(self, group_attribute_name, group_specified=None):
+    def collate_allocation_user_data(self, group_attribute_name, include_new, group_specified=None):
         coldfront_allocation_users = []
         # get project users mapped to groups and projects
-        allocations_with_groups = Allocation.objects.filter(
-            status__name="Active", allocationattribute__allocation_attribute_type__name=group_attribute_name
-        ).distinct()
+        allocations_with_groups = None
+        if include_new:
+            allocations_with_groups = Allocation.objects.filter(
+                status__name__in=["Active", "New"], allocationattribute__allocation_attribute_type__name=group_attribute_name
+            ).distinct()
+        else:
+            allocations_with_groups = Allocation.objects.filter(
+                status__name="Active", allocationattribute__allocation_attribute_type__name=group_attribute_name
+            ).distinct()
         self.stdout.write("Found %d allocations with groups." % allocations_with_groups.count())
         for allocation in allocations_with_groups:
             self.stdout.write("Processing allocation %s (ID: %s)..." % (allocation.resources.first().name, allocation.pk))
@@ -151,6 +165,7 @@ class Command(BaseCommand):
         dry_run = options.get("dry_run", False)
         #no_header = options.get("no_header", False)
         sync_to = options.get("sync_to", False)
+        include_new = options.get("include_new", False)
 
         if username_specified:
             self.stdout.write("Filtering to username: %s" % username_specified)
@@ -166,12 +181,12 @@ class Command(BaseCommand):
         group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
         if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
             self.stdout.write("Managing groups at the project level...")
-            coldfront_users_and_groups = self.collate_project_user_data(group_attribute_name, group_specified)
+            coldfront_users_and_groups = self.collate_project_user_data(group_attribute_name, include_new,group_specified)
 
         else:
             self.stdout.write("Managing groups at the allocation level...")
             # get allocation users mapped to groups and allocations
-            coldfront_users_and_groups = self.collate_allocation_user_data(group_attribute_name, group_specified)
+            coldfront_users_and_groups = self.collate_allocation_user_data(group_attribute_name, include_new, group_specified)
 
         group_set = set([n for sub in coldfront_users_and_groups for n in sub["groups"]])
         # query external system for members of each group
@@ -285,4 +300,20 @@ class Command(BaseCommand):
             self.stdout.write("Sync complete.")
         else:
             self.stdout.write("Dry run complete. No changes were made.")
-        return differences
+        if len(differences) == 0:
+            self.stdout.write("No differences found between Coldfront and external system.")
+        else:
+            self.stdout.write("Found %d differences between Coldfront and external system:" % len(differences))
+            for diff in differences:
+                difference_type = "project" if "project" in diff else "allocation"
+                self.stdout.write(
+                    "- %s: %s (ID: %s), Group: %s, Missing from external: %s, Missing from Coldfront: %s"
+                    % (
+                        difference_type.capitalize(),
+                        diff[difference_type],
+                        diff[f"{difference_type}_id"],
+                        diff["group"],
+                        ", ".join(diff["missing_from_external"]) if diff["missing_from_external"] else "None",
+                        ", ".join(diff["missing_from_coldfront"]) if diff["missing_from_coldfront"] else "None",
+                    )
+                )
