@@ -1,11 +1,12 @@
 import logging
 
-from coldfront.core.allocation.models import Allocation, AllocationUser
-from coldfront.core.project.models import Project, ProjectUser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django_auth_ldap.backend import LDAPBackend
+
+from coldfront.core.allocation.models import Allocation, AllocationUser
+from coldfront.core.project.models import Project, ProjectUser
 
 from user_management import utils
 
@@ -24,6 +25,7 @@ class Command(BaseCommand):
         )
         parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
+        parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
 
     def collate_project_user_data(self, group_attribute_name, group_specified=None):
         coldfront_project_users = []
@@ -31,12 +33,12 @@ class Command(BaseCommand):
         projects_with_groups = Project.objects.filter(
             status__name="Active", projectattribute__proj_attr_type__name=group_attribute_name
         ).distinct()
-        logger.info("Found %d projects with groups.", projects_with_groups.count())
+        self.stdout.write("Found %d projects with groups.", projects_with_groups.count())
         for project in projects_with_groups:
-            logger.info("Processing project %s (ID: %s)...", project.title, project.pk)
+            self.stdout.write("Processing project %s (ID: %s)...", project.title, project.pk)
             project_info = {"project": project.title, "project_id": project.pk, "groups": [], "users": []}
             # get groups from project attributes
-            groups = set(project.get_attribute_list(group_attribute_name))
+            groups = utils.get_project_attribute_values_set(project, group_attribute_name)
             if group_specified and group_specified not in groups:
                 logger.debug(
                     "  Skipping project %s due to group filter. Group '%s' not in project groups %s.",
@@ -50,7 +52,6 @@ class Command(BaseCommand):
                 continue
             logger.debug("    Groups from project attribute '%s': %s", group_attribute_name, groups)
             project_info["groups"] = list(groups)
-
             # get active project users
             project_users = ProjectUser.objects.filter(project=project, status__name="Active").select_related("user")
             project_info["users"] = list(project_users.values_list("user__username", flat=True))
@@ -66,9 +67,9 @@ class Command(BaseCommand):
         allocations_with_groups = Allocation.objects.filter(
             status__name="Active", allocationattribute__allocation_attribute_type__name=group_attribute_name
         ).distinct()
-        logger.info("Found %d allocations with groups.", allocations_with_groups.count())
+        self.stdout.write("Found %d allocations with groups.", allocations_with_groups.count())
         for allocation in allocations_with_groups:
-            logger.info("Processing allocation %s (ID: %s)...", allocation.resources.first().name, allocation.pk)
+            self.stdout.write("Processing allocation %s (ID: %s)...", allocation.resources.first().name, allocation.pk)
             allocation_info = {
                 "allocation": allocation.resources.first().name,
                 "allocation_id": allocation.pk,
@@ -106,11 +107,11 @@ class Command(BaseCommand):
         client = utils.get_client()
         external_users_and_groups = []
         for group in group_set:
-            logger.info("Querying external system for members of group %s...", group)
+            self.stdout.write("Querying external system for members of group %s...", group)
             try:
                 members = client.get_group_members(group)
             except Exception as e:
-                logger.error("Failed to get members of group %s: %s", group, e)
+                self.stderr.write("Failed to get members of group %s: %s", group, e)
                 continue
             external_users_and_groups.append({"group": group, "members": members})
         return external_users_and_groups
@@ -152,23 +153,23 @@ class Command(BaseCommand):
         sync_to = options.get("sync_to", False)
 
         if username_specified:
-            logger.info("Filtering to username: %s", username_specified)
+            self.stdout.write("Filtering to username: %s", username_specified)
         if group_specified:
-            logger.info("Filtering to group: %s", group_specified)
+            self.stdout.write("Filtering to group: %s", group_specified)
         if dry_run:
-            logger.info("Dry run mode enabled. No changes will be made.")
+            self.stdout.write("Dry run mode enabled. No changes will be made.")
         if no_header:
-            logger.info("No header mode enabled. Header will be excluded from output.")
+            self.stdout.write("No header mode enabled. Header will be excluded from output.")
 
         # get list of groups from coldfront mapped to projects/allocations
         # determine whether to sync at the project or allocation level
         group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
         if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
-            logger.info("Managing groups at the project level...")
+            self.stdout.write("Managing groups at the project level...")
             coldfront_users_and_groups = self.collate_project_user_data(group_attribute_name, group_specified)
 
         else:
-            logger.info("Managing groups at the allocation level...")
+            self.stdout.write("Managing groups at the allocation level...")
             # get allocation users mapped to groups and allocations
             coldfront_users_and_groups = self.collate_allocation_user_data(group_attribute_name, group_specified)
 
@@ -181,7 +182,7 @@ class Command(BaseCommand):
 
         if not dry_run:
             if sync_to:
-                logger.info("Syncing changes to external system...")
+                self.stdout.write("Syncing changes to external system...")
                 client = utils.get_client()
                 # sync coldfront users and groups to external system
                 # for each difference, add users missing from external, remove users missing from coldfront
@@ -190,22 +191,22 @@ class Command(BaseCommand):
                         if username_specified and user != username_specified:
                             logger.debug("  Skipping add of user %s due to username filter.", user)
                             continue
-                        logger.info("Adding user %s to group %s...", user, diff["group"])
+                        self.stdout.write("Adding user %s to group %s...", user, diff["group"])
                         try:
                             client.add_user_to_group(user, diff["group"])
                         except IOError as e:
-                            logger.error("Failed to add user %s to group %s: %s", user, diff["group"], e)
+                            self.stdout.write("Failed to add user %s to group %s: %s", user, diff["group"], e)
                     for user in diff["missing_from_coldfront"]:
                         if username_specified and user != username_specified:
                             logger.debug("  Skipping remove of user %s due to username filter.", user)
                             continue
-                        logger.info("Removing user %s from group %s...", user, diff["group"])
+                        self.stdout.write("Removing user %s from group %s...", user, diff["group"])
                         try:
                             client.remove_user_from_group(user, diff["group"])
                         except IOError as e:
-                            logger.error("Failed to remove user %s from group %s: %s", user, diff["group"], e)
+                            self.stdout.write("Failed to remove user %s from group %s: %s", user, diff["group"], e)
             else:
-                logger.info("Syncing changes from external system...")
+                self.stdout.write("Syncing changes from external system...")
                 # sync external group memberships to coldfront
                 # for each difference, add users missing from coldfront, remove users missing from external
                 for diff in differences:
@@ -217,7 +218,7 @@ class Command(BaseCommand):
                             if username_specified and user != username_specified:
                                 logger.debug("  Skipping add of user %s due to username filter.", user)
                                 continue
-                            logger.info("Adding user %s to project %s...", user, diff["project"])
+                            self.stdout.write("Adding user %s to project %s...", user, diff["project"])
                             try:
                                 # add the user to the Project
                                 # create a ProjectUser object with status 'Active'
@@ -229,14 +230,14 @@ class Command(BaseCommand):
                                 pu = ProjectUser(project=p, user=user_obj, status="Active")
                                 pu.save()
                             except Exception as e:
-                                logger.error("Failed to add user %s to project %s: %s", user, diff["project"], e)
+                                self.stdout.write("Failed to add user %s to project %s: %s", user, diff["project"], e)
 
                         project_users = ProjectUser.objects.filter(project=p)
                         for user in diff["missing_from_external"]:
                             if username_specified and user != username_specified:
                                 logger.debug("  Skipping remove of user %s due to username filter.", user)
                                 continue
-                            logger.info("Removing user %s from project %s...", user, diff["project"])
+                            self.stdout.write("Removing user %s from project %s...", user, diff["project"])
                             try:
                                 # remove the user from the Project
                                 for pu in project_users:
@@ -244,7 +245,7 @@ class Command(BaseCommand):
                                         pu.status = "Removed"
                                         pu.save()
                             except Exception as e:
-                                logger.error("Failed to remove user %s from project %s: %s", user, diff["project"], e)
+                                self.stdout.write("Failed to remove user %s from project %s: %s", user, diff["project"], e)
                     else:  # allocation level
                         # get the Allocation object
                         a = Allocation.objects.get(pk=diff["allocation_id"])
@@ -252,7 +253,7 @@ class Command(BaseCommand):
                             if username_specified and user != username_specified:
                                 logger.debug("  Skipping add of user %s due to username filter.", user)
                                 continue
-                            logger.info("Adding user %s to allocation %s...", user, diff["allocation"])
+                            self.stdout.write("Adding user %s to allocation %s...", user, diff["allocation"])
                             try:
                                 # add the user to the Allocation
                                 # create an AllocationUser object with status 'Active'
@@ -264,13 +265,13 @@ class Command(BaseCommand):
                                 au = AllocationUser(allocation=a, user=user_obj, status="Active")
                                 au.save()
                             except Exception as e:
-                                logger.error("Failed to add user %s to allocation %s: %s", user, diff["allocation"], e)
+                                self.stdout.write("Failed to add user %s to allocation %s: %s", user, diff["allocation"], e)
                         allocation_users = AllocationUser.objects.filter(allocation=a)
                         for user in diff["missing_from_external"]:
                             if username_specified and user != username_specified:
                                 logger.debug("  Skipping remove of user %s due to username filter.", user)
                                 continue
-                            logger.info("Removing user %s from allocation %s...", user, diff["allocation"])
+                            self.stdout.write("Removing user %s from allocation %s...", user, diff["allocation"])
                             try:
                                 # remove the user from the Allocation
                                 for au in allocation_users:
@@ -278,10 +279,10 @@ class Command(BaseCommand):
                                         au.status = "Removed"
                                         au.save()
                             except Exception as e:
-                                logger.error(
+                                self.stdout.write(
                                     "Failed to remove user %s from allocation %s: %s", user, diff["allocation"], e
                                 )
-            logger.info("Sync complete.")
+            self.stdout.write("Sync complete.")
         else:
-            logger.info("Dry run complete. No changes were made.")
+            self.stdout.write("Dry run complete. No changes were made.")
         return differences
