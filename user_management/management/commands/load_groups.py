@@ -85,8 +85,8 @@ class Command(BaseCommand):
                 "has_usage": False,
                 "is_required": False,
                 "is_unique": False,
-                "is_private": False,
-                "is_changeable": True,
+                "is_private": True,
+                "is_changeable": False,
             },
         )
         if created and not dry_run:
