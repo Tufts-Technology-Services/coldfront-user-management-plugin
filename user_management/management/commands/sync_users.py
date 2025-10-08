@@ -23,9 +23,9 @@ class Command(BaseCommand):
         parser.add_argument(
             "-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true"
         )
-        parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
-        parser.add_argument("-f", "--format", help="json or csv output", default=None)
-        parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
+        #parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
+        #parser.add_argument("-f", "--format", help="json or csv output", default=None)
+        #parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
 
     def collate_project_user_data(self, group_attribute_name, group_specified=None):
         coldfront_project_users = []
@@ -149,7 +149,7 @@ class Command(BaseCommand):
         username_specified = options.get("username", None)
         group_specified = options.get("group", None)
         dry_run = options.get("dry_run", False)
-        no_header = options.get("no_header", False)
+        #no_header = options.get("no_header", False)
         sync_to = options.get("sync_to", False)
 
         if username_specified:
@@ -158,8 +158,8 @@ class Command(BaseCommand):
             self.stdout.write("Filtering to group: %s", group_specified)
         if dry_run:
             self.stdout.write("Dry run mode enabled. No changes will be made.")
-        if no_header:
-            self.stdout.write("No header mode enabled. Header will be excluded from output.")
+        #if no_header:
+       #     self.stdout.write("No header mode enabled. Header will be excluded from output.")
 
         # get list of groups from coldfront mapped to projects/allocations
         # determine whether to sync at the project or allocation level
