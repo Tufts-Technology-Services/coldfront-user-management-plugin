@@ -22,6 +22,7 @@ class Command(BaseCommand):
             choices=["project", "allocation"],
             required=False,
         )
+        parser.add_argument("-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False)
         parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
 
@@ -56,11 +57,14 @@ class Command(BaseCommand):
                 json.dump(rows, file, indent=4)
                 logger.info("Wrote to json output file %s.", output_file)
 
-    def get_group_attribute_info_for_projects(self, group_attribute_name: str) -> list[dict]:
+    def get_group_attribute_info_for_projects(self, group_attribute_name: str, include_new: bool = False) -> list[dict]:
         logger.info("Getting group attribute info at the project level...")
         info = []
         # get a list of projects
-        projects = project_models.Project.objects.filter(status__name="Active")
+        if include_new:
+            projects = project_models.Project.objects.filter(status__name__in=["Active", "New"])
+        else:
+            projects = project_models.Project.objects.filter(status__name="Active")
         logger.info("Found %d active projects.", projects.count())
         for project in projects:
             # check if the current project has the group attribute defined
@@ -85,11 +89,14 @@ class Command(BaseCommand):
                 )
         return info
 
-    def get_group_attribute_info_for_allocations(self, group_attribute_name: str) -> list[dict]:
+    def get_group_attribute_info_for_allocations(self, group_attribute_name: str, include_new: bool = False) -> list[dict]:
         logger.info("Getting group attribute info at the allocation level...")
         info = []
         # get a list of allocations
-        allocations = allocation_models.Allocation.objects.filter(status__name="Active")
+        if include_new:
+            allocations = allocation_models.Allocation.objects.filter(status__name__in=["Active", "New"])
+        else:
+            allocations = allocation_models.Allocation.objects.filter(status__name="Active")
         logger.info("Found %d active allocations.", allocations.count())
         for allocation in allocations:
             # check if the current allocation has the group attribute defined
@@ -97,20 +104,22 @@ class Command(BaseCommand):
                 allocation_attribute_type__name=group_attribute_name
             )
             if allocation_attributes.exists():
-                logger.info("  Allocation %s:%s has group attribute defined.", allocation.project.title, allocation.resources.first().name)
+                logger.info("  Allocation %s:%s has group attribute defined.", 
+                            allocation.project.title, allocation.resources.first().name)
                 info.append(
                     {
                         "project": allocation.project.title,
                         "project_pi": allocation.pi.username,
                         "allocation": allocation.resources.first().name,
                         "allocation_id": allocation.pk,
-                        "group": allocation_attributes.first().value,  # assuming only one attribute of this type per allocation
+                        "group": allocation_attributes.first().value,  # assuming only one per allocation
                     }
                 )
 
             else:
                 logger.info(
-                    "  Allocation %s(%s) does not have group attribute defined.", allocation.resources.first().name, allocation.pk
+                    "  Allocation %s(%s) does not have group attribute defined.", 
+                    allocation.resources.first().name, allocation.pk
                 )
                 info.append(
                     {
@@ -134,7 +143,7 @@ class Command(BaseCommand):
 
         # determine whether to get attributes at the project or allocation level
         alignment = self.parse_alignment(options.get("alignment"))
-
+        include_new = options.get("include_new", False)
         # initialize differences tracking
         info = []
 
@@ -143,12 +152,11 @@ class Command(BaseCommand):
         group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
         if alignment == "project":
             logger.info("Getting group attribute info at the project level...")
-
-            info = self.get_group_attribute_info_for_projects(group_attribute_name)
+            info = self.get_group_attribute_info_for_projects(group_attribute_name, include_new)
 
         else:
             logger.info("Getting group attribute info at the allocation level...")
-            info = self.get_group_attribute_info_for_allocations(group_attribute_name)
+            info = self.get_group_attribute_info_for_allocations(group_attribute_name, include_new)
 
         # write differences to output file
         self.handle_output(info, output_file, options.get("format"))

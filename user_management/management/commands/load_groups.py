@@ -26,6 +26,7 @@ class Command(BaseCommand):
             choices=["project", "allocation"],
             required=False,
         )
+        parser.add_argument("-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False)
         parser.add_argument("-i", "--input-file", help="Path to input file containing group mappings", required=True)
         parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
         parser.add_argument(
@@ -93,10 +94,14 @@ class Command(BaseCommand):
             logger.info("ProjectAttributeType '%s' already exists.", group_attribute_name)
         return project_attribute_type
 
-    def set_group_attribute_for_projects(self, project_attribute_type, group_mappings, dry_run):
+    def set_group_attribute_for_projects(self, project_attribute_type, group_mappings, include_new, dry_run):
         logger.info("Setting group attribute at the project level...")
         # get a list of projects
-        projects = project_models.Project.objects.filter(status__name="Active")
+        projects = None
+        if include_new:
+            projects = project_models.Project.objects.filter(status__name__in=["Active", "New"])
+        else:
+            projects = project_models.Project.objects.filter(status__name="Active")
         logger.info("Found %d active projects.", projects.count())
         for project in projects:
             # get the group for the current project from the input file
@@ -181,9 +186,13 @@ class Command(BaseCommand):
             logger.info("AllocationAttributeType '%s' already exists.", group_attribute_name)
         return allocation_attribute_type
 
-    def set_group_attribute_for_allocations(self, allocation_attribute_type, group_mappings, dry_run):
+    def set_group_attribute_for_allocations(self, allocation_attribute_type, group_mappings, include_new, dry_run):
         # get a list of allocations
-        allocations = allocation_models.Allocation.objects.filter(status__name="Active")
+        allocations = None
+        if include_new:
+            allocations = allocation_models.Allocation.objects.filter(status__name__in=["Active", "New"])
+        else:
+            allocations = allocation_models.Allocation.objects.filter(status__name="Active")
         logger.info("Found %d active allocations.", allocations.count())
         for allocation in allocations:
             # get the group for the current allocation from the input file
@@ -336,7 +345,7 @@ class Command(BaseCommand):
 
         input_file = options.get("input_file")
         group_mappings = self.handle_input_file(input_file)
-
+        
         output_file = options.get("output_file")
         if not output_file:
             logger.error("Output file is required.")
@@ -347,6 +356,7 @@ class Command(BaseCommand):
         # processes a list of groups mapped to projects or allocations
         # determine whether to set attributes at the project or allocation level
         alignment = self.parse_alignment(options.get("alignment"))
+        include_new = options.get("include_new", False)
 
         # initialize differences tracking
         self.differences = {"added": [], "updated": [], "skipped": []}  # to track changes made
@@ -357,12 +367,13 @@ class Command(BaseCommand):
         if alignment == "project":
             logger.info("Setting group attribute at the project level...")
             project_attribute_type = self.get_project_attribute_type(group_attribute_name, dry_run)
-            self.set_group_attribute_for_projects(project_attribute_type, group_mappings, dry_run)
+            self.set_group_attribute_for_projects(project_attribute_type, group_mappings, include_new, dry_run)
+
 
         else:
             logger.info("Setting group attribute at the allocation level...")
             allocation_attribute_type = self.get_allocation_attribute_type(group_attribute_name, dry_run)
-            self.set_group_attribute_for_allocations(allocation_attribute_type, group_mappings, dry_run)
+            self.set_group_attribute_for_allocations(allocation_attribute_type, group_mappings, include_new, dry_run)
         logger.info("Group attribute update process complete.")
 
         self.handle_differences(group_mappings, output_file)
