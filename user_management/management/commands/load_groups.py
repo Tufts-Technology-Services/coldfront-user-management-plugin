@@ -67,9 +67,10 @@ class Command(BaseCommand):
             if group is None or group.strip() == "":
                 logger.warning("Skipping row with empty group: %s", row)
                 continue
+            
             if allocation_id is not None and allocation_id.strip() != "":
                 group_mappings[allocation_id.strip()] = group
-            elif (project is None or project.strip() == "") and (pi_username is None or pi_username.strip() == ""):
+            elif (project is not None and project.strip() != "") and (pi_username is not None and pi_username.strip() != ""):
                 group_mappings[f"{project}_{pi_username}".lower().strip()] = group
             else:
                 logger.warning("Skipping invalid row: %s", row)

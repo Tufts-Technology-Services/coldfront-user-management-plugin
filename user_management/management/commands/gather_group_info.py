@@ -74,7 +74,7 @@ class Command(BaseCommand):
                 info.append(
                     {
                         "project": project.title,
-                        "project_pi": project.pi.username,
+                        "pi_username": project.pi.username,
                         "group": project_attributes.first().value,  # assuming only one attribute of this type per project
                     }
                 )
@@ -83,7 +83,7 @@ class Command(BaseCommand):
                 info.append(
                     {
                         "project": project.title,
-                        "project_pi": project.pi.username,
+                        "pi_username": project.pi.username,
                         "group": "",
                     }
                 )
@@ -109,7 +109,7 @@ class Command(BaseCommand):
                 info.append(
                     {
                         "project": allocation.project.title,
-                        "project_pi": allocation.pi.username,
+                        "pi_username": allocation.pi.username,
                         "allocation": allocation.resources.first().name,
                         "allocation_id": allocation.pk,
                         "group": allocation_attributes.first().value,  # assuming only one per allocation
@@ -124,7 +124,7 @@ class Command(BaseCommand):
                 info.append(
                     {
                         "project": allocation.project.title,
-                        "project_pi": allocation.pi.username,
+                        "pi_username": allocation.pi.username,
                         "allocation": allocation.resources.first().name,
                         "allocation_id": allocation.pk,
                         "group": "",
