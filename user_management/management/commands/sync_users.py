@@ -8,7 +8,7 @@ from django_auth_ldap.backend import LDAPBackend
 from coldfront.core.allocation.models import Allocation, AllocationUser
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserRoleChoice, ProjectUserStatusChoice
 
-from coldfront.plugins.user_management import utils
+from user_management import utils
 
 logger = logging.getLogger(__name__)
 
