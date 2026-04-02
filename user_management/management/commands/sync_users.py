@@ -6,9 +6,9 @@ from django.core.management.base import BaseCommand
 from django_auth_ldap.backend import LDAPBackend
 
 from coldfront.core.allocation.models import Allocation, AllocationUser
-from coldfront.core.project.models import Project, ProjectUser
+from coldfront.core.project.models import Project, ProjectUser, ProjectUserRoleChoice, ProjectUserStatusChoice
 
-from user_management import utils
+from coldfront.plugins.user_management import utils
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class Command(BaseCommand):
             logger.debug("  Project PI: %s (ID: %s)", project.pi.username, project.pi.pk)
             project_info["users"].append(project.pi.username)
             coldfront_project_users.append(project_info)
-            return coldfront_project_users
+        return coldfront_project_users
 
     def collate_allocation_user_data(self, group_attribute_name, include_new, group_specified=None):
         coldfront_allocation_users = []
@@ -121,13 +121,20 @@ class Command(BaseCommand):
         client = utils.get_client()
         external_users_and_groups = []
         for group in group_set:
+            errors = []
             self.stdout.write("Querying external system for members of group %s..." % group)
             try:
-                members = client.get_group_members(group)
+                if client.group_exists(group):
+                    members = client.get_group_members(group)
+                else:
+                    self.stdout.write("Group %s does not exist in external system." % group)
+                    errors.append(f"Group {group} does not exist in external system.")
+                    members = []
             except Exception as e:
                 self.stderr.write("Failed to get members of group %s: %s" % (group, e))
+                errors.append(f"Failed to get members of group {group}: {e}")
                 continue
-            external_users_and_groups.append({"group": group, "members": members})
+            external_users_and_groups.append({"group": group, "members": members, "errors": errors})
         return external_users_and_groups
 
     def compare_coldfront_to_external(self, coldfront_users_and_groups, external_users_and_groups):
@@ -144,11 +151,12 @@ class Command(BaseCommand):
                 if missing_from_external or missing_from_coldfront:
                     differences.append(
                         {
-                            alignment: entry[alignment],
+                            "alignment": entry[alignment],
                             f"{alignment}_id": entry[f"{alignment}_id"],
                             "group": group,
                             "missing_from_external": list(missing_from_external),
                             "missing_from_coldfront": list(missing_from_coldfront),
+                            "errors": [i for e in external_users_and_groups if e["group"] == group and "errors" in e for i in e['errors']],
                         }
                     )
                     logger.debug(
@@ -158,6 +166,127 @@ class Command(BaseCommand):
                         len(missing_from_coldfront),
                     )
         return differences
+    
+    def sync_to_external(self, diff, username_specified=None):
+        client = utils.get_client()
+        for user in diff["missing_from_external"]:
+            if username_specified and user != username_specified:
+                logger.debug("  Skipping add of user %s due to username filter.", user)
+                continue
+            self.stdout.write("Adding user %s to group %s..." % (user, diff["group"]))
+            try:
+                client.add_user_to_group(user, diff["group"])
+            except IOError as e:
+                self.stdout.write("Failed to add user %s to group %s: %s" % (user, diff["group"], e))
+        for user in diff["missing_from_coldfront"]:
+            if username_specified and user != username_specified:
+                logger.debug("  Skipping remove of user %s due to username filter.", user)
+                continue
+            self.stdout.write("Removing user %s from group %s..." % (user, diff["group"]))
+            try:
+                client.remove_user_from_group(user, diff["group"])
+            except IOError as e:
+                self.stdout.write("Failed to remove user %s from group %s: %s" % (user, diff["group"], e))
+
+    def sync_to_coldfront_projects(self, diff, username_specified=None):
+        if diff.get("errors", []):
+            logger.warning(
+                "Skipping sync for group %s due to errors: %s", diff["group"], "; ".join(diff["errors"])
+            )
+            self.stdout.write("Skipping sync for group %s due to errors: %s" % (diff["group"], "; ".join(diff["errors"])))
+            return
+        # get the Project object
+        p = Project.objects.get(pk=diff["project_id"])
+        project_allocations = Allocation.objects.filter(project=p)
+        active_status = ProjectUserStatusChoice.objects.get(name="Active")
+        user_role = ProjectUserRoleChoice.objects.get(name="User")
+        
+        for user in diff["missing_from_coldfront"]:
+            if username_specified and user != username_specified:
+                logger.debug("  Skipping add of user %s due to username filter.", user)
+                continue
+            self.stdout.write("Adding user %s to project %s..." % (user, diff["project"]))
+            try:
+                # add the user to the Project
+                # create a ProjectUser object with status 'Active'
+                user_obj, created = User.objects.get_or_create(username=user)
+                if created:
+                    # populate user details from LDAP
+                    LDAPBackend().populate_user(user_obj)
+
+                pu, _ = ProjectUser.objects.get_or_create(project=p, user=user_obj, status=active_status, role=user_role)
+
+                for allocation in project_allocations:
+                    allocation.add_user(user_obj)
+            except Exception as e:
+                self.stdout.write("Failed to add user %s to project %s: %s" % (user, diff["project"], e))
+        
+        # remove users from project
+        project_users = ProjectUser.objects.filter(project=p)
+        project_allocations = Allocation.objects.filter(project=p)
+        removed_status = ProjectUserStatusChoice.objects.get(name="Removed")
+
+        for user in diff["missing_from_external"]:
+            if username_specified and user != username_specified:
+                logger.debug("  Skipping remove of user %s due to username filter.", user)
+                continue
+            self.stdout.write("Removing user %s from project %s..." % (user, diff["project"]))
+            try:
+                # remove the user from the Project
+                for pu in project_users:
+                    if pu.user.username == user:
+                        pu.status = removed_status
+                        pu.save()
+                
+                user_obj= User.objects.get(username=user)
+                for allocation in project_allocations:
+                    allocation.remove_user(user_obj)
+            except Exception as e:
+                self.stdout.write("Failed to remove user %s from project %s: %s" % (user, diff["project"], e))
+
+    def sync_to_coldfront_allocations(self, diff, username_specified=None):
+        # get the Allocation object
+        a = Allocation.objects.get(pk=diff["allocation_id"])
+        for user in diff["missing_from_coldfront"]:
+            if username_specified and user != username_specified:
+                logger.debug("  Skipping add of user %s due to username filter.", user)
+                continue
+            self.stdout.write("Adding user %s to allocation %s..." % (user, diff["allocation"]))
+            try:
+                # add the user to the Allocation
+                # create an AllocationUser object with status 'Active'
+                user_obj, created = User.objects.get_or_create(username=user)
+                if created:
+                    # populate user details from LDAP
+                    LDAPBackend().populate_user_from_ldap(user)
+
+                au = AllocationUser(allocation=a, user=user_obj, status="Active")
+                au.save()
+            except Exception as e:
+                self.stdout.write("Failed to add user %s to allocation %s: %s" % (user, diff["allocation"], e))
+        allocation_users = AllocationUser.objects.filter(allocation=a)
+        for user in diff["missing_from_external"]:
+            if username_specified and user != username_specified:
+                logger.debug("  Skipping remove of user %s due to username filter.", user)
+                continue
+            self.stdout.write("Removing user %s from allocation %s..." % (user, diff["allocation"]))
+            try:
+                # remove the user from the Allocation
+                for au in allocation_users:
+                    if au.user.username == user:
+                        au.status = "Removed"
+                        au.save()
+            except Exception as e:
+                self.stdout.write(
+                    "Failed to remove user %s from allocation %s: %s" % (user, diff["allocation"], e)
+                )
+
+    def sync_to_coldfront(self, diff, username_specified=None):
+        difference_type = "project" if "project" in diff else "allocation"
+        if difference_type == "project":
+            self.sync_to_coldfront_projects(diff, username_specified)
+        else:  # allocation level
+            self.sync_to_coldfront_allocations(diff, username_specified)
 
     def handle(self, *args, **options):
         username_specified = options.get("username", None)
@@ -198,105 +327,17 @@ class Command(BaseCommand):
         if not dry_run:
             if sync_to:
                 self.stdout.write("Syncing changes to external system...")
-                client = utils.get_client()
                 # sync coldfront users and groups to external system
                 # for each difference, add users missing from external, remove users missing from coldfront
                 for diff in differences:
-                    for user in diff["missing_from_external"]:
-                        if username_specified and user != username_specified:
-                            logger.debug("  Skipping add of user %s due to username filter.", user)
-                            continue
-                        self.stdout.write("Adding user %s to group %s..." % (user, diff["group"]))
-                        try:
-                            client.add_user_to_group(user, diff["group"])
-                        except IOError as e:
-                            self.stdout.write("Failed to add user %s to group %s: %s" % (user, diff["group"], e))
-                    for user in diff["missing_from_coldfront"]:
-                        if username_specified and user != username_specified:
-                            logger.debug("  Skipping remove of user %s due to username filter.", user)
-                            continue
-                        self.stdout.write("Removing user %s from group %s..." % (user, diff["group"]))
-                        try:
-                            client.remove_user_from_group(user, diff["group"])
-                        except IOError as e:
-                            self.stdout.write("Failed to remove user %s from group %s: %s" % (user, diff["group"], e))
+                    self.sync_to_external(diff, username_specified)
             else:
-                self.stdout.write("Syncing changes from external system...")
+                self.stdout.write("Syncing changes from external system to coldfront..")
                 # sync external group memberships to coldfront
                 # for each difference, add users missing from coldfront, remove users missing from external
                 for diff in differences:
-                    difference_type = "project" if "project" in diff else "allocation"
-                    if difference_type == "project":
-                        # get the Project object
-                        p = Project.objects.get(pk=diff["project_id"])
-                        for user in diff["missing_from_coldfront"]:
-                            if username_specified and user != username_specified:
-                                logger.debug("  Skipping add of user %s due to username filter.", user)
-                                continue
-                            self.stdout.write("Adding user %s to project %s..." % (user, diff["project"]))
-                            try:
-                                # add the user to the Project
-                                # create a ProjectUser object with status 'Active'
-                                user_obj, created = User.objects.get_or_create(username=user)
-                                if created:
-                                    # populate user details from LDAP
-                                    LDAPBackend().populate_user_from_ldap(user)
+                    self.sync_to_coldfront(diff, username_specified)
 
-                                pu = ProjectUser(project=p, user=user_obj, status="Active")
-                                pu.save()
-                            except Exception as e:
-                                self.stdout.write("Failed to add user %s to project %s: %s" % (user, diff["project"], e))
-
-                        project_users = ProjectUser.objects.filter(project=p)
-                        for user in diff["missing_from_external"]:
-                            if username_specified and user != username_specified:
-                                logger.debug("  Skipping remove of user %s due to username filter.", user)
-                                continue
-                            self.stdout.write("Removing user %s from project %s..." % (user, diff["project"]))
-                            try:
-                                # remove the user from the Project
-                                for pu in project_users:
-                                    if pu.user.username == user:
-                                        pu.status = "Removed"
-                                        pu.save()
-                            except Exception as e:
-                                self.stdout.write("Failed to remove user %s from project %s: %s" % (user, diff["project"], e))
-                    else:  # allocation level
-                        # get the Allocation object
-                        a = Allocation.objects.get(pk=diff["allocation_id"])
-                        for user in diff["missing_from_coldfront"]:
-                            if username_specified and user != username_specified:
-                                logger.debug("  Skipping add of user %s due to username filter.", user)
-                                continue
-                            self.stdout.write("Adding user %s to allocation %s..." % (user, diff["allocation"]))
-                            try:
-                                # add the user to the Allocation
-                                # create an AllocationUser object with status 'Active'
-                                user_obj, created = User.objects.get_or_create(username=user)
-                                if created:
-                                    # populate user details from LDAP
-                                    LDAPBackend().populate_user_from_ldap(user)
-
-                                au = AllocationUser(allocation=a, user=user_obj, status="Active")
-                                au.save()
-                            except Exception as e:
-                                self.stdout.write("Failed to add user %s to allocation %s: %s" % (user, diff["allocation"], e))
-                        allocation_users = AllocationUser.objects.filter(allocation=a)
-                        for user in diff["missing_from_external"]:
-                            if username_specified and user != username_specified:
-                                logger.debug("  Skipping remove of user %s due to username filter.", user)
-                                continue
-                            self.stdout.write("Removing user %s from allocation %s..." % (user, diff["allocation"]))
-                            try:
-                                # remove the user from the Allocation
-                                for au in allocation_users:
-                                    if au.user.username == user:
-                                        au.status = "Removed"
-                                        au.save()
-                            except Exception as e:
-                                self.stdout.write(
-                                    "Failed to remove user %s from allocation %s: %s" % (user, diff["allocation"], e)
-                                )
             self.stdout.write("Sync complete.")
         else:
             self.stdout.write("Dry run complete. No changes were made.")
@@ -317,3 +358,7 @@ class Command(BaseCommand):
                         ", ".join(diff["missing_from_coldfront"]) if diff["missing_from_coldfront"] else "None",
                     )
                 )
+                if len(diff.get("errors", [])) > 0:
+                    self.stdout.write("  Errors:")
+                    for err in diff["errors"]:
+                        self.stdout.write("   - %s" % err)
