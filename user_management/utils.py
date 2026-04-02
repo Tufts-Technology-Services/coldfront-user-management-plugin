@@ -150,7 +150,7 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
 
 
 def _get_client_module():
-    default_path = Path(sys.modules["coldfront.plugins.user_management"].__file__).parent / "grouper_user_management_client.py"
+    default_path = Path(sys.modules["user_management"].__file__).parent / "grouper_user_management_client.py"
     path = Path(settings.USER_MANAGEMENT_CLIENT_PATH) if hasattr(settings, "USER_MANAGEMENT_CLIENT_PATH") and len(settings.USER_MANAGEMENT_CLIENT_PATH) > 0 else default_path
     module_name = path.stem
 
