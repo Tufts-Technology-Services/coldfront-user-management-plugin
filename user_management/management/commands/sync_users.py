@@ -282,8 +282,7 @@ class Command(BaseCommand):
                 )
 
     def sync_to_coldfront(self, diff, username_specified=None):
-        difference_type = "project" if "project" in diff else "allocation"
-        if difference_type == "project":
+        if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
             self.sync_to_coldfront_projects(diff, username_specified)
         else:  # allocation level
             self.sync_to_coldfront_allocations(diff, username_specified)
