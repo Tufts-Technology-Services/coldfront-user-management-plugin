@@ -45,8 +45,8 @@ class UserManagementClient:
 
     def add_user_to_group(self, user, group):
         try:
-            r = self.client.add_member_to_group(group, user)
-            logger.debug("Grouper add_member_to_group response: %s", r)
+            r = self.client.add_members_to_group(group, [user])
+            logger.debug("Grouper add_members_to_group response: %s", r)
             return True
         except IOError as e:
             logger.error("Failed to add user %s to group %s: %s", user, group, e)
@@ -54,8 +54,8 @@ class UserManagementClient:
 
     def remove_user_from_group(self, user, group):
         try:
-            r = self.client.remove_member_from_group(group, user)
-            logger.debug("Grouper remove_member_from_group response: %s", r)
+            r = self.client.remove_members_from_group(group, [user])
+            logger.debug("Grouper remove_members_from_group response: %s", r)
             return True
         except IOError as e:
             logger.error("Failed to remove user %s from group %s: %s", user, group, e)
