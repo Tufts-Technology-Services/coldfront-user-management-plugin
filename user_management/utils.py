@@ -8,7 +8,7 @@ from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice
 from django.conf import settings
 
-from user_management.user_management_client import UserManagementClient
+from .user_management_client import UserManagementClient
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,8 @@ def _remove_user_from_group(user: str, group: str, client: UserManagementClient)
     client.remove_user_from_group(user, group)
 
 
-def add_user_to_group_set(user: str, groups: set[str], error_callback=None) -> None:
+def add_user_to_group_set(user: str, groups: set[str], error_callback=None,
+                          callback_args=None) -> None:
     client = get_client()
     # validate that groups is a set
     if not isinstance(groups, set):
@@ -79,12 +80,16 @@ def add_user_to_group_set(user: str, groups: set[str], error_callback=None) -> N
         except Exception as e:  # Catch all other exceptions
             logger.error("Failed adding user %s to group %s: %s", user, group, e)
             if error_callback:
-                error_callback()
+                if callback_args:
+                    error_callback(*callback_args)
+                else:
+                    error_callback()
         else:
             logger.info("Added user %s to group %s successfully", user, group)
 
 
-def remove_user_from_group_set(user: str, groups: set[str], error_callback=None) -> None:
+def remove_user_from_group_set(user: str, groups: set[str], 
+                               error_callback=None, callback_args=None) -> None:
     client = get_client()
     # validate that groups is a set
     if not isinstance(groups, set):
@@ -100,7 +105,10 @@ def remove_user_from_group_set(user: str, groups: set[str], error_callback=None)
         except Exception as e:  # Catch all other exceptions
             logger.error("Failed removing user %s from group %s: %s", user, group, e)
             if error_callback:
-                error_callback()
+                if callback_args:
+                    error_callback(*callback_args)
+                else:
+                    error_callback()
         else:
             logger.info("Removed user %s from group %s successfully", user, group)
 
@@ -142,8 +150,8 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
 
 
 def _get_client_module():
-    default_path = Path(sys.modules["user_management"].__file__).parent / "grouper_user_management_client.py"
-    path = Path(settings.USER_MANAGEMENT_CLIENT_PATH) if hasattr(settings, "USER_MANAGEMENT_CLIENT_PATH") else default_path
+    default_path = Path(sys.modules["coldfront.plugins.user_management"].__file__).parent / "grouper_user_management_client.py"
+    path = Path(settings.USER_MANAGEMENT_CLIENT_PATH) if hasattr(settings, "USER_MANAGEMENT_CLIENT_PATH") and len(settings.USER_MANAGEMENT_CLIENT_PATH) > 0 else default_path
     module_name = path.stem
 
     if module_name in sys.modules:
