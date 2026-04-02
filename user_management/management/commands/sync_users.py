@@ -140,8 +140,11 @@ class Command(BaseCommand):
     def compare_coldfront_to_external(self, coldfront_users_and_groups, external_users_and_groups):
         differences = []
         external_group_dict = {g["group"]: set(g["members"]) for g in external_users_and_groups}
+        if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
+            alignment = "project"
+        else:            
+            alignment = "allocation"
         for entry in coldfront_users_and_groups:
-            alignment = "project" if "project" in entry else "allocation"
             groups = entry["groups"]
             users = set(entry["users"])
             for group in groups:
@@ -151,7 +154,7 @@ class Command(BaseCommand):
                 if missing_from_external or missing_from_coldfront:
                     differences.append(
                         {
-                            "alignment": entry[alignment],
+                            "alignment": alignment,
                             f"{alignment}_id": entry[f"{alignment}_id"],
                             "group": group,
                             "missing_from_external": list(missing_from_external),
