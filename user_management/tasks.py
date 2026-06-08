@@ -1,9 +1,10 @@
 import logging
 
+from django.conf import settings
+
 from coldfront.core.allocation.models import AllocationUser, Allocation
 from coldfront.core.allocation.utils import set_allocation_user_status_to_error
-from coldfront.core.project.models import Project, ProjectUser
-from django.conf import settings
+from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice
 
 from user_management import utils
 
@@ -234,3 +235,44 @@ def remove_all_project_users_from_groups(project_pk):
         )
         return
     utils.remove_user_from_group_set(pi_user.username, group_diff)
+
+
+def sync_project_users_from_external(project_pk):
+    """
+    Sync all users and groups with the external system. This is a potentially long-running task that should be run asynchronously.
+    """
+    project = Project.objects.get(pk=project_pk)
+    group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
+    groups = utils.get_project_attribute_values_set(project, group_attribute_name)
+    if len(groups) == 0:
+        logger.info("Project does not have any groups. Nothing to sync")
+        return
+    usernames = set()
+    client = utils.get_client()
+    for group in groups:
+         if not client.group_exists(group):
+             logger.warning("Group %s does not exist in external system. Skipping group.", group)
+             continue
+         group_members = client.get_group_members(group)
+         usernames.update(group_members)
+
+    project_users = ProjectUser.objects.filter(project__pk=project_pk).values_list("user__username", flat=True).distinct()
+    project_users.update(project.pi.user.username)
+    missing_users = usernames - set(project_users)
+    for username in missing_users:
+        logger.info("User %s is a member of project group(s) but does not have an active project user record. Creating project user.", username)
+        utils.create_project_user_from_username(username, project)
+
+
+
+def sync_project_users_to_allocations():
+    """
+    Syncs users in active projects to all active allocations in the project. This is necessary when 
+    group membership is managed at the project level
+    """
+    projects = Project.objects.filter(status__name="Active")
+    for p in projects:
+        pusers = ProjectUser.objects.filter(project=p, status=ProjectUserStatusChoice.objects.get(name="Active"))
+        for u in pusers:
+            add_project_user_to_allocations(u.id)
+    

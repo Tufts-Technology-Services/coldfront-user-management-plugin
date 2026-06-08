@@ -338,8 +338,11 @@ class Command(BaseCommand):
                 # sync external group memberships to coldfront
                 # for each difference, add users missing from coldfront, remove users missing from external
                 for diff in differences:
-                    self.sync_to_coldfront(diff, username_specified)
-
+                    try:
+                        self.sync_to_coldfront(diff, username_specified)
+                    except Exception as e:
+                        self.stdout.write("Failed syncing user %s to Coldfront: %s", username_specified, e)
+                        self.stdout.write(diff)
             self.stdout.write("Sync complete.")
         else:
             self.stdout.write("Dry run complete. No changes were made.")

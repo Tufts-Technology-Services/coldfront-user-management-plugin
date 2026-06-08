@@ -4,9 +4,14 @@ import logging
 import sys
 from pathlib import Path
 
-from coldfront.core.allocation.models import Allocation
-from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice
 from django.conf import settings
+
+from django.contrib.auth.models import User
+from django_auth_ldap.backend import LDAPBackend
+
+from coldfront.core.allocation.models import Allocation
+from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice, ProjectUserRoleChoice
+
 
 from .user_management_client import UserManagementClient
 
@@ -147,6 +152,22 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
     for p in other_user_projects:
         other_groups.extend(get_project_attribute_values_set(p, group_attribute_name))
     return set(other_groups)
+
+
+def create_project_user_from_username(username, project, role='User', status='Active'):
+    user_obj, created = User.objects.get_or_create(username=username)
+    if created:
+            # populate user details from LDAP
+        LDAPBackend().populate_user(user_obj)
+    pu_role = ProjectUserRoleChoice.objects.get(name=role)
+    pu_status = ProjectUserStatusChoice.objects.get(name=status)
+    project_user, created = ProjectUser.objects.get_or_create(
+        user=user_obj,
+        project=project,
+        role=pu_role,
+        status=pu_status
+    )
+    return project_user
 
 
 def _get_client_module():
