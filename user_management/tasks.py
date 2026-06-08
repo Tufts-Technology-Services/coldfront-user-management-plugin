@@ -248,7 +248,7 @@ def sync_project_users_from_external(project_pk):
          usernames.update(group_members)
 
     project_users = ProjectUser.objects.filter(project__pk=project_pk).values_list("user__username", flat=True).distinct()
-    project_users.update(project.pi.user.username)
+    project_users.update(project.pi.username)
     missing_users = usernames - set(project_users)
     for username in missing_users:
         logger.info("User %s is a member of project group(s) but does not have an active project user record. Creating project user.", username)
