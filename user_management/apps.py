@@ -4,8 +4,15 @@
 import logging
 
 from django.apps import AppConfig
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+
+from user_management.constants import (
+    USER_MANAGEMENT_ENABLE_SIGNALS,
+    USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE,
+    MANAGE_GROUPS_AT_PROJECT_LEVEL,
+    UNIX_GROUP_ATTRIBUTE_NAME,
+    USER_MANAGEMENT_CLIENT_PATH,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +33,14 @@ class UserManagementConfig(AppConfig):
 
         get_client_class().test_config()
 
-        if settings.USER_MANAGEMENT_ENABLE_SIGNALS:
+        if USER_MANAGEMENT_ENABLE_SIGNALS:
             logger.info("Initializing User Management Plugin signal receivers...")
             # pylint: disable=import-outside-toplevel
             from user_management.signals import init_signal_receivers
 
             # default is to manage group membership at the allocation level
             init_signal_receivers(
-                settings.MANAGE_GROUPS_AT_PROJECT_LEVEL, settings.USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE
+                MANAGE_GROUPS_AT_PROJECT_LEVEL, USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE
             )
         else:
             logger.warning(
@@ -47,22 +54,19 @@ class UserManagementConfig(AppConfig):
         Raises ImproperlyConfigured if any setting is invalid.
         """
         bool_plugin_settings = [
-            "USER_MANAGEMENT_ENABLE_SIGNALS",
-            "MANAGE_GROUPS_AT_PROJECT_LEVEL",
-            "USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE",
+            USER_MANAGEMENT_ENABLE_SIGNALS,
+            MANAGE_GROUPS_AT_PROJECT_LEVEL,
+            USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE,
         ]
         string_plugin_settings = [
-            "UNIX_GROUP_ATTRIBUTE_NAME",
-            "USER_MANAGEMENT_CLIENT_PATH",
+            UNIX_GROUP_ATTRIBUTE_NAME,
+            USER_MANAGEMENT_CLIENT_PATH,
         ]
-        for s in bool_plugin_settings + string_plugin_settings:
-            if not hasattr(settings, s):
-                raise ImproperlyConfigured(f"{s} must be defined.")
 
         for b in bool_plugin_settings:
-            if not isinstance(getattr(settings, b), bool):
+            if not isinstance(b, bool):
                 raise ImproperlyConfigured(f"{b} must be a boolean.")
 
         for st in string_plugin_settings:
-            if not isinstance(getattr(settings, st), str) and getattr(settings, st) is not None:
+            if not isinstance(st, str) and st is not None:
                 raise ImproperlyConfigured(f"{st} must be a string or None.")
