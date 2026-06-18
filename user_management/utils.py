@@ -53,8 +53,7 @@ def _add_user_to_group(user: str, group: str, client: UserManagementClient) -> N
     if not group_exists:
         logger.info("Creating group %s...", group)
         client.create_group(group)
-    members = client.get_group_members(group)
-    if user in members:
+    if client.user_in_group(group, user):
         raise AlreadyMemberError(f"user {user} is already a member of group {group}")
     else:
         client.add_user_to_group(user, group)
@@ -64,8 +63,7 @@ def _remove_user_from_group(user: str, group: str, client: UserManagementClient)
     group_exists = client.group_exists(group)
     if not group_exists:
         raise GroupDoesNotExistError(f"group {group} does not exist in grouper")
-    members = client.get_group_members(group)
-    if user not in members:
+    if not client.user_in_group(group, user):
         raise NotMemberError(f"user {user} is not a member of group {group}")
     client.remove_user_from_group(user, group)
 
