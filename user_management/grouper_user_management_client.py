@@ -63,7 +63,7 @@ class UserManagementClient:
 
     def user_in_group(self, user, group):
         try:
-            return self.client.is_user_in_group(group, user)
+            return self.client.is_user_in_group(user, group)
         except IOError as e:
             logger.error("Failed to check if user %s is in group %s: %s", user, group, e)
             return False
