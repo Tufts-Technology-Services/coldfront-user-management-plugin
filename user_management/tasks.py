@@ -255,14 +255,13 @@ def sync_project_users_from_external(project_pk):
         utils.create_project_user_from_username(username, project)
 
 
-def sync_project_users_to_allocations():
+def sync_project_users_to_allocations(allocation_id):
     """
     Syncs users in active projects to all active allocations in the project. This is necessary when 
     group membership is managed at the project level
     """
-    projects = Project.objects.filter(status__name="Active")
-    for p in projects:
-        pusers = ProjectUser.objects.filter(project=p, status=ProjectUserStatusChoice.objects.get(name="Active"))
-        for u in pusers:
-            add_project_user_to_allocations(u.id)
+    allocation = Allocation.objects.get(id=allocation_id)
+    pusers = ProjectUser.objects.filter(project=allocation.project, status=ProjectUserStatusChoice.objects.get(name="Active"))
+    for u in pusers:
+        add_project_user_to_allocations(u.id)
     
