@@ -78,4 +78,4 @@ def remove_all_project_users(sender, **kwargs):
 
 def sync_project_users(sender, **kwargs):
     allocation_pk = kwargs.get("allocation_pk")
-    async_task("user_management.tasks.sync_all_project_users_to_allocations", allocation_pk)
+    async_task("user_management.tasks.sync_project_users_to_allocations", allocation_pk)
