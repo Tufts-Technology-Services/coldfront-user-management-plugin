@@ -255,6 +255,14 @@ def sync_project_users_from_external(project_pk):
         utils.create_project_user_from_username(username, project)
 
 
+def sync_all_project_users_from_external():
+    """
+    Sync all users and groups for all projects with the external system.
+    """
+    for project in Project.objects.all():
+        sync_project_users_from_external(project.pk)
+
+
 def sync_project_users_to_allocations(allocation_id):
     """
     Syncs users in active projects to all active allocations in the project. This is necessary when 
