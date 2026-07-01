@@ -74,13 +74,17 @@ def add_user_to_group_set(user: str, groups: set[str], error_callback=None,
     # validate that groups is a set
     if not isinstance(groups, set):
         raise ValueError("groups must be a set of group names")
+    successful_additions = []
+    failed_additions = []
     for group in groups:
         try:
             _add_user_to_group(user, group, client)
         except AlreadyMemberError:
+            failed_additions.append(group)
             logger.warning("User %s is already a member of group %s", user, group)
         # pylint: disable=broad-except
         except Exception as e:  # Catch all other exceptions
+            failed_additions.append(group)
             logger.error("Failed adding user %s to group %s: %s", user, group, e)
             if error_callback:
                 if callback_args:
@@ -88,7 +92,18 @@ def add_user_to_group_set(user: str, groups: set[str], error_callback=None,
                 else:
                     error_callback()
         else:
+            successful_additions.append(group)
             logger.info("Added user %s to group %s successfully", user, group)
+    message = ""
+    if not successful_additions and not failed_additions:
+        message = f"No groups were provided to add user {user} to."
+    if not successful_additions and failed_additions:
+        message = f"Failed to add user {user} to groups [{', '.join(failed_additions)}]."
+    if successful_additions and not failed_additions:
+        message = f"User {user} added to groups [{', '.join(successful_additions)}] successfully."
+    if successful_additions and failed_additions:
+        message = f"User {user} added to groups [{', '.join(successful_additions)}] successfully. Failed to add user {user} to groups [{', '.join(failed_additions)}]."
+    return {"message": message, "successful_additions": successful_additions, "failed_additions": failed_additions}
 
 
 def remove_user_from_group_set(user: str, groups: set[str], 
@@ -159,7 +174,7 @@ def create_project_user_from_username(username, project, role='User', status='Ac
         user_search = LDAPUserSearch("", "")
         results = user_search.search_a_user(username, 'username_only')
         if not results:
-            logger.warning("User %s not found in LDAP. User will be created with default values.", username)
+            logger.error("User %s not found in LDAP. User will be created with default values.", username)
         else:
             user_info = results[0]
             user_obj.first_name = user_info.get('first_name', '')

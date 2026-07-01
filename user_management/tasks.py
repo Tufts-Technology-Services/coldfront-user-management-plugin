@@ -22,26 +22,25 @@ def add_allocation_user_to_group(user_pk):
     allocation_user = AllocationUser.objects.get(pk=user_pk)
     if allocation_user.allocation.status.name != "Active":
         logger.warning("Allocation is not active. Will not add user")
-        return False
+        return {"message": f"Allocation is not active. {allocation_user.user.username} not added."}
 
     if allocation_user.status.name != "Active":
         logger.warning("Allocation user status is not 'Active'. Will not add user.")
-        return False
+        return {}
 
     groups = set(allocation_user.allocation.get_attribute_list(UNIX_GROUP_ATTRIBUTE_NAME))
     logger.debug("DEBUG: groups from allocation attribute '%s': %s", UNIX_GROUP_ATTRIBUTE_NAME, groups)
     if len(groups) == 0:
         logger.info("Allocation does not have any groups. Nothing to add")
-        return False
+        return {"message": f"Allocation does not have any groups. {allocation_user.user.username} not added."}
     logger.debug(
         "DEBUG: calling add_user_to_group_set for user %s and groups %s", allocation_user.user.username, groups
     )
-    utils.add_user_to_group_set(
+    return utils.add_user_to_group_set(
         allocation_user.user.username, groups, 
         error_callback=set_allocation_user_status_to_error,
         callback_args=(allocation_user.pk,)
     )  # for allocation: set_allocation_user_status_to_error(user_pk) on error
-    return True
 
 
 def add_project_user_to_group(user_pk):
@@ -55,18 +54,18 @@ def add_project_user_to_group(user_pk):
     project_user = ProjectUser.objects.get(pk=user_pk)
     if project_user.project.status.name != "Active":
         logger.warning("Project is not active. Will not add user")
-        return
+        return {"message": f"Project is not active. {project_user.user.username} not added."}
 
     if project_user.status.name != "Active":
         logger.warning("Project user status is not 'Active'. Will not add user.")
-        return
+        return {"message": f"Project user status is not 'Active'. {project_user.user.username} not added."}
     
     groups = utils.get_project_attribute_values_set(project_user.project, UNIX_GROUP_ATTRIBUTE_NAME)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to add")
-        return
+        return {"message": f"Project does not have any groups. {project_user.user.username} not added."}
 
-    utils.add_user_to_group_set(
+    return utils.add_user_to_group_set(
         project_user.user.username, groups, 
         error_callback=utils.set_project_user_status_to_pending,
         callback_args=(project_user.pk)
@@ -102,16 +101,16 @@ def remove_allocation_user_from_group(user_pk):
         "Inactive (Renewed)",
     ]:
         logger.warning("Allocation is not active or pending. Will not remove user from group")
-        return
+        return {"message": f"Allocation is not active or pending. {allocation_user.user.username} not removed."}
     # check allocation user status
     if allocation_user.status.name != "Removed":
         logger.warning("Allocation user status is not 'Removed'. Will not remove user from group.")
-        return
+        return {"message": f"Allocation user status is not 'Removed'. {allocation_user.user.username} not removed."}
 
     groups = allocation_user.allocation.get_attribute_list(UNIX_GROUP_ATTRIBUTE_NAME)
     if len(groups) == 0:
         logger.info("Allocation does not have any groups. Nothing to remove")
-        return
+        return {"message": f"Allocation does not have any groups. {allocation_user.user.username} not removed."}
 
     # Ensure we don't remove the user from groups they belong to in other active allocations.
     other_groups = utils.collect_other_allocation_user_groups(
@@ -125,9 +124,9 @@ def remove_allocation_user_from_group(user_pk):
             "No groups to remove. User may belong to these groups in other active allocations: %s",
             set(groups).intersection(other_groups),
         )
-        return
+        return {"message": f"No groups to remove user from. {allocation_user.user.username} may belong to these groups in other active allocations: {set(groups).intersection(other_groups)}"}
 
-    utils.remove_user_from_group_set(
+    return utils.remove_user_from_group_set(
         allocation_user.user.username, group_diff, 
         error_callback=set_allocation_user_status_to_error,
         callback_args=(allocation_user.pk,)
@@ -149,15 +148,15 @@ def remove_project_user_from_group(user_pk):
         "Archived",
     ]:
         logger.warning("Project is archived. Will not remove user from group")
-        return
+        return {"message": f"Project is archived. {project_user.user.username} not removed."}
 
     if project_user.status.name != "Removed":
         logger.warning("Project user status is not 'Removed'. Will not remove user from group.")
-        return
+        return {"message": f"Project user status is not 'Removed'. {project_user.user.username} not removed."}
     groups = utils.get_project_attribute_values_set(project_user.project, UNIX_GROUP_ATTRIBUTE_NAME)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to remove")
-        return
+        return {"message": f"Project does not have any groups. {project_user.user.username} not removed."}
 
     # Ensure we don't remove the user from groups they belong to in other active projects.
     other_groups = utils.collect_other_project_user_groups(
@@ -169,9 +168,9 @@ def remove_project_user_from_group(user_pk):
         logger.info(
             "No groups to remove. User may belong to these groups in other active or new projects: %s", other_groups
         )
-        return
+        return {"message": f"No groups to remove for user {project_user.user.username}. User may belong to these groups in other active or new projects: {other_groups}"}
 
-    utils.remove_user_from_group_set(
+    return utils.remove_user_from_group_set(
         project_user.user.username, group_diff, 
         error_callback=utils.set_project_user_status_to_pending,
         callback_args=(project_user.pk)
@@ -189,12 +188,12 @@ def remove_all_project_users_from_groups(project_pk):
     project = Project.objects.get(pk=project_pk)
     if project.status.name != "Archived":
         logger.warning("Project is not archived. Will not remove users from groups")
-        return
+        return {"message": f"Project is not archived. Users not removed from groups."}
 
     groups = utils.get_project_attribute_values_set(project, UNIX_GROUP_ATTRIBUTE_NAME)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to remove")
-        return
+        return {"message": f"Project does not have any groups. Users not removed from groups."}
 
     project_users = ProjectUser.objects.filter(project__pk=project_pk)
     for project_user in project_users:
