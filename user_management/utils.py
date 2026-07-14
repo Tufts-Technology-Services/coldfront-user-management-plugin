@@ -7,13 +7,13 @@ from pathlib import Path
 from django.conf import settings
 
 from django.contrib.auth.models import User
-from django_auth_ldap.backend import LDAPBackend
 
 from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice, ProjectUserRoleChoice
 from coldfront.plugins.ldap_user_search.utils import LDAPUserSearch
 
 from .user_management_client import UserManagementClient
+from .constants import UNIX_GROUP_ATTRIBUTE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -227,3 +227,23 @@ def get_client() -> UserManagementClient:
     """Returns an instance of the UserManagementClient subclass as specified in settings."""
     client_class = get_client_class()
     return client_class()
+
+
+def get_project_group_members_from_external(project_pk):
+    """
+    Get all members of the project's groups from the external system. This is a potentially long-running task that should be run asynchronously.
+    """
+    project = Project.objects.get(pk=project_pk)
+    groups = get_project_attribute_values_set(project, UNIX_GROUP_ATTRIBUTE_NAME)
+    if len(groups) == 0:
+        logger.info("Project does not have any groups. Nothing to sync")
+        raise ValueError("Project does not have any groups.")
+    usernames = set()
+    client = get_client()
+    for group in groups:
+         if not client.group_exists(group):
+             logger.warning("Group %s does not exist in external system. Skipping group.", group)
+             raise GroupDoesNotExistError(f"group {group} does not exist in external system")
+         group_members = client.get_group_members(group)
+         usernames.update(group_members)
+    return groups, usernames
