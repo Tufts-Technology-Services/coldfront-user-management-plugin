@@ -238,12 +238,16 @@ def get_project_group_members_from_external(project_pk):
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to sync")
         raise ValueError("Project does not have any groups.")
+    if len(groups) > 1:
+        logger.warning(
+            "Project has multiple groups defined. This is not supported. Will sync users from the first group only: %s", groups
+        )
     usernames = set()
     client = get_client()
-    for group in groups:
-         if not client.group_exists(group):
-             logger.warning("Group %s does not exist in external system. Skipping group.", group)
-             raise GroupDoesNotExistError(f"group {group} does not exist in external system")
-         group_members = client.get_group_members(group)
-         usernames.update(group_members)
-    return groups, usernames
+    group = list(groups)[0]
+    if not client.group_exists(group):
+        logger.warning("Group %s does not exist in external system. Skipping group.", group)
+        raise GroupDoesNotExistError(f"group {group} does not exist in external system")
+    group_members = client.get_group_members(group)
+    usernames.update(group_members)
+    return group, usernames

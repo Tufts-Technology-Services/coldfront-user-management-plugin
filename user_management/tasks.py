@@ -237,14 +237,18 @@ def sync_project_users_from_external(project_pk):
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to sync")
         return
+    if len(groups) > 1:
+        logger.warning(
+            "Project has multiple groups defined. This is not supported. Will sync users from the first group only: %s", groups
+        )
+    group = list(groups)[0]
     usernames = set()
     client = utils.get_client()
-    for group in groups:
-         if not client.group_exists(group):
-             logger.warning("Group %s does not exist in external system. Skipping group.", group)
-             continue
-         group_members = client.get_group_members(group)
-         usernames.update(group_members)
+    if not client.group_exists(group):
+        logger.warning("Group %s does not exist in external system. Skipping group.", group)
+    else:
+        group_members = client.get_group_members(group)
+        usernames.update(group_members)
 
     project_users = list(ProjectUser.objects.filter(project__pk=project_pk).values_list("user__username", flat=True).distinct())
     project_users.append(project.pi.username) # ensure PI is included in project users
