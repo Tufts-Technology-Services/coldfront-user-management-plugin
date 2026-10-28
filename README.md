@@ -32,6 +32,18 @@ To implement a new user management client, follow these steps:
 providing methods for managing user groups and permissions.
 2. Update the `USER_MANAGEMENT_CLIENT_PATH` setting in your ColdFront configuration to point to your new client module.
 
+## Running the Tests
+
+The tests run under pytest with ColdFront's settings plus this plugin's
+(`user_management/tests/settings.py`), and use an in-memory stand-in for the group service
+(`user_management/tests/helpers.py`), so they need no Grouper or LDAP server. The `ldap` extra
+is needed because the plugin imports ColdFront's LDAP user search.
+
+```
+uv sync --extra ldap
+uv run pytest
+```
+
 ## Additional Information
 ## Relevant Signals
 Coldfront uses emits signals to notify plugins of certain events. The User Management Plugin connects to several signals to manage user group membership based on project and allocation events. These include:

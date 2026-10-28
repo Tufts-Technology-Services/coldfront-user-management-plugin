@@ -68,7 +68,7 @@ def add_project_user_to_group(user_pk):
     return utils.add_user_to_group_set(
         project_user.user.username, groups, 
         error_callback=utils.set_project_user_status_to_pending,
-        callback_args=(project_user.pk)
+        callback_args=(project_user.pk,)
     )
 
 
@@ -173,7 +173,7 @@ def remove_project_user_from_group(user_pk):
     return utils.remove_user_from_group_set(
         project_user.user.username, group_diff, 
         error_callback=utils.set_project_user_status_to_pending,
-        callback_args=(project_user.pk)
+        callback_args=(project_user.pk,)
     )
 
 
@@ -211,7 +211,7 @@ def remove_all_project_users_from_groups(project_pk):
         utils.remove_user_from_group_set(
             project_user.user.username, group_diff, 
             error_callback=utils.set_project_user_status_to_pending,
-            callback_args=(project_user.pk)
+            callback_args=(project_user.pk,)
         )
 
     # remove PI from project groups as well

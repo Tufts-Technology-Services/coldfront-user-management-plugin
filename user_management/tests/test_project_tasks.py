@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from coldfront.core.project.models import ProjectUserStatusChoice
 from coldfront.core.test_helpers.factories import ProjectFactory, ProjectUserFactory, UserFactory
 from django.test import TestCase, override_settings
 
@@ -8,6 +9,7 @@ from user_management.tasks import (
     remove_all_project_users_from_groups,
     remove_project_user_from_group,
 )
+from user_management.tests.test_utils import FailingClient
 from user_management.utils import set_project_user_status_to_pending
 
 
@@ -29,7 +31,10 @@ class AddProjectUserToGroupTests(TestCase):
         mock_add_user_to_group_set.return_value = None
         add_project_user_to_group(mock_project_user.pk)
         mock_add_user_to_group_set.assert_called_once_with(
-            "testuser", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+            "testuser",
+            {"group1", "group2"},
+            error_callback=set_project_user_status_to_pending,
+            callback_args=(self.project_user.pk,),
         )
 
     @patch("user_management.tasks.ProjectUser")
@@ -84,7 +89,10 @@ class RemoveProjectUserFromGroupTests(TestCase):
             self.project_user.user, "ad_group", self.project_user.project.pk
         )
         mock_remove_user_from_group_set.assert_called_once_with(
-            "testuser", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+            "testuser",
+            {"group1", "group2"},
+            error_callback=set_project_user_status_to_pending,
+            callback_args=(self.project_user.pk,),
         )
 
     @patch("user_management.tasks.ProjectUser")
@@ -139,13 +147,22 @@ class RemoveAllUsersFromProjectGroupsTests(TestCase):
         self.assertEqual(mock_collect_other_project_user_groups.call_count, 4)  # 3 users + 1 PI
         self.assertEqual(mock_remove_user_from_group_set.call_count, 4)
         mock_remove_user_from_group_set.assert_any_call(
-            "user1", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+            "user1",
+            {"group1", "group2"},
+            error_callback=set_project_user_status_to_pending,
+            callback_args=(self.project_user1.pk,),
         )
         mock_remove_user_from_group_set.assert_any_call(
-            "user2", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+            "user2",
+            {"group1", "group2"},
+            error_callback=set_project_user_status_to_pending,
+            callback_args=(self.project_user2.pk,),
         )
         mock_remove_user_from_group_set.assert_any_call(
-            "user3", {"group1", "group2"}, error_callback=set_project_user_status_to_pending
+            "user3",
+            {"group1", "group2"},
+            error_callback=set_project_user_status_to_pending,
+            callback_args=(self.project_user3.pk,),
         )
         mock_remove_user_from_group_set.assert_any_call("piuser", {"group1", "group2"})
 
@@ -186,3 +203,27 @@ class RemoveAllUsersFromProjectGroupsTests(TestCase):
         remove_all_project_users_from_groups(self.project.pk)
         self.assertEqual(mock_collect_other_project_user_groups.call_count, 4)  # 3 users + 1 PI
         mock_remove_user_from_group_set.assert_not_called()
+
+
+@override_settings(UNIX_GROUP_ATTRIBUTE_NAME="ad_group")
+class ProjectUserGroupFailureTests(TestCase):
+    """
+    The whole path when the group service fails, without mocking the callback: the member is set
+    to Pending. A callback_args of (pk) rather than (pk,) made this raise a TypeError instead.
+    """
+
+    def setUp(self):
+        self.project_user = ProjectUserFactory()
+        self.project_user.status.name = "Active"
+        self.project_user.status.save()
+        self.project_user.project.status.name = "Active"
+        self.project_user.project.status.save()
+        ProjectUserStatusChoice.objects.get_or_create(name="Pending")
+
+    @patch("user_management.utils.get_project_attribute_values_set", return_value={"group1"})
+    def test_a_failed_addition_sets_the_member_to_pending(self, _groups):
+        with patch("user_management.utils.get_client", return_value=FailingClient(member=False)):
+            add_project_user_to_group(self.project_user.pk)
+
+        self.project_user.refresh_from_db()
+        self.assertEqual(self.project_user.status.name, "Pending")
