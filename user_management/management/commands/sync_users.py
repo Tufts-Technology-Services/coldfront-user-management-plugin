@@ -341,8 +341,12 @@ class Command(BaseCommand):
                     try:
                         self.sync_to_coldfront(diff, username_specified)
                     except Exception as e:
-                        self.stdout.write("Failed syncing user %s to Coldfront: %s", username_specified, e)
-                        self.stdout.write(diff)
+                        # one project or allocation failing shouldn't stop the rest of the sync
+                        kind = "project" if "project" in diff else "allocation"
+                        self.stderr.write(
+                            f"Failed syncing {kind} {diff.get(kind)} (ID: {diff.get(f'{kind}_id')}), "
+                            f"group {diff.get('group')}, to ColdFront: {type(e).__name__}: {e}"
+                        )
             self.stdout.write("Sync complete.")
         else:
             self.stdout.write("Dry run complete. No changes were made.")
