@@ -4,16 +4,14 @@ import logging
 import sys
 from pathlib import Path
 
+from coldfront.core.allocation.models import Allocation
+from coldfront.core.project.models import Project, ProjectUser, ProjectUserRoleChoice, ProjectUserStatusChoice
+from coldfront.plugins.ldap_user_search.utils import LDAPUserSearch
 from django.conf import settings
-
 from django.contrib.auth.models import User
 
-from coldfront.core.allocation.models import Allocation
-from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice, ProjectUserRoleChoice
-from coldfront.plugins.ldap_user_search.utils import LDAPUserSearch
-
-from .user_management_client import UserManagementClient
 from .constants import UNIX_GROUP_ATTRIBUTE_NAME
+from .user_management_client import UserManagementClient
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +51,7 @@ def _add_user_to_group(user: str, group: str, client: UserManagementClient) -> N
     if not group_exists:
         logger.info("Creating group %s...", group)
         client.create_group(group)
-    if client.user_in_group(group, user):
+    if client.user_in_group(user, group):
         raise AlreadyMemberError(f"user {user} is already a member of group {group}")
     else:
         client.add_user_to_group(user, group)
@@ -63,13 +61,12 @@ def _remove_user_from_group(user: str, group: str, client: UserManagementClient)
     group_exists = client.group_exists(group)
     if not group_exists:
         raise GroupDoesNotExistError(f"group {group} does not exist in grouper")
-    if not client.user_in_group(group, user):
+    if not client.user_in_group(user, group):
         raise NotMemberError(f"user {user} is not a member of group {group}")
     client.remove_user_from_group(user, group)
 
 
-def add_user_to_group_set(user: str, groups: set[str], error_callback=None,
-                          callback_args=None) -> None:
+def add_user_to_group_set(user: str, groups: set[str], error_callback=None, callback_args=None) -> None:
     client = get_client()
     # validate that groups is a set
     if not isinstance(groups, set):
@@ -106,8 +103,7 @@ def add_user_to_group_set(user: str, groups: set[str], error_callback=None,
     return {"message": message, "successful_additions": successful_additions, "failed_additions": failed_additions}
 
 
-def remove_user_from_group_set(user: str, groups: set[str], 
-                               error_callback=None, callback_args=None) -> None:
+def remove_user_from_group_set(user: str, groups: set[str], error_callback=None, callback_args=None) -> None:
     client = get_client()
     # validate that groups is a set
     if not isinstance(groups, set):
@@ -167,35 +163,36 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
     return set(other_groups)
 
 
-def create_project_user_from_username(username, project, role='User', status='Active'):
+def create_project_user_from_username(username, project, role="User", status="Active"):
     user_obj, created = User.objects.get_or_create(username=username)
     if created:
         # populate user details from LDAP
         user_search = LDAPUserSearch("", "")
-        results = user_search.search_a_user(username, 'username_only')
+        results = user_search.search_a_user(username, "username_only")
         if not results:
             logger.error("User %s not found in LDAP. User will be created with default values.", username)
         else:
             user_info = results[0]
-            user_obj.first_name = user_info.get('first_name', '')
-            user_obj.last_name = user_info.get('last_name', '')
-            user_obj.email = user_info.get('email', '')
+            user_obj.first_name = user_info.get("first_name", "")
+            user_obj.last_name = user_info.get("last_name", "")
+            user_obj.email = user_info.get("email", "")
             user_obj.save()
-    
+
     pu_role = ProjectUserRoleChoice.objects.get(name=role)
     pu_status = ProjectUserStatusChoice.objects.get(name=status)
     project_user, created = ProjectUser.objects.get_or_create(
-        user=user_obj,
-        project=project,
-        role=pu_role,
-        status=pu_status
+        user=user_obj, project=project, role=pu_role, status=pu_status
     )
     return project_user
 
 
 def _get_client_module():
     default_path = Path(sys.modules["user_management"].__file__).parent / "grouper_user_management_client.py"
-    path = Path(settings.USER_MANAGEMENT_CLIENT_PATH) if hasattr(settings, "USER_MANAGEMENT_CLIENT_PATH") and len(settings.USER_MANAGEMENT_CLIENT_PATH) > 0 else default_path
+    path = (
+        Path(settings.USER_MANAGEMENT_CLIENT_PATH)
+        if hasattr(settings, "USER_MANAGEMENT_CLIENT_PATH") and len(settings.USER_MANAGEMENT_CLIENT_PATH) > 0
+        else default_path
+    )
     module_name = path.stem
 
     if module_name in sys.modules:
@@ -240,7 +237,8 @@ def get_project_group_members_from_external(project_pk):
         raise ValueError("Project does not have any groups.")
     if len(groups) > 1:
         logger.warning(
-            "Project has multiple groups defined. This is not supported. Will sync users from the first group only: %s", groups
+            "Project has multiple groups defined. This is not supported. Will sync users from the first group only: %s",
+            groups,
         )
     usernames = set()
     client = get_client()

@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.test import TestCase
 
@@ -8,6 +10,8 @@ from user_management.utils import (
     NotMemberError,
     _add_user_to_group,
     _remove_user_from_group,
+    add_user_to_group_set,
+    remove_user_from_group_set,
 )
 
 
@@ -70,3 +74,45 @@ class TestUserManagementUtils(TestCase):
         # Group does not exist
         with pytest.raises(GroupDoesNotExistError):
             _remove_user_from_group(user, group, client)
+
+
+class FailingClient:
+    """
+    A client whose changes all fail, as when the group service is down. `member` is what it says
+    about membership, so the call under test gets as far as the failing change: an addition needs
+    the user not to be a member yet, a removal needs them to be one.
+    """
+
+    def __init__(self, member):
+        self.member = member
+
+    def group_exists(self, group):
+        return True
+
+    def create_group(self, group):
+        return True
+
+    def user_in_group(self, user, group):
+        return self.member
+
+    def add_user_to_group(self, user, group):
+        raise IOError("group service unavailable")
+
+    def remove_user_from_group(self, user, group):
+        raise IOError("group service unavailable")
+
+
+class TestErrorCallback(TestCase):
+    """callback_args are unpacked into the callback, so they must be a tuple: (pk,), not (pk)."""
+
+    def test_add_failure_calls_the_callback_with_its_args(self):
+        callback = MagicMock()
+        with patch("user_management.utils.get_client", return_value=FailingClient(member=False)):
+            add_user_to_group_set("alice", {"g1"}, error_callback=callback, callback_args=(7,))
+        callback.assert_called_once_with(7)
+
+    def test_remove_failure_calls_the_callback_with_its_args(self):
+        callback = MagicMock()
+        with patch("user_management.utils.get_client", return_value=FailingClient(member=True)):
+            remove_user_from_group_set("alice", {"g1"}, error_callback=callback, callback_args=(7,))
+        callback.assert_called_once_with(7)

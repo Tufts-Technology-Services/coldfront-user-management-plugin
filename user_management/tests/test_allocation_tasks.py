@@ -26,7 +26,10 @@ class AddAllocationUserToGroupTests(TestCase):
         mock_add_user_to_group_set.return_value = None
         _ = add_allocation_user_to_group(int(mock_AllocationUser.pk))
         mock_add_user_to_group_set.assert_called_once_with(
-            "testuser", {"group1", "group2"}, error_callback=set_allocation_user_status_to_error
+            "testuser",
+            {"group1", "group2"},
+            error_callback=set_allocation_user_status_to_error,
+            callback_args=(self.allocation_user.pk,),
         )
 
     @patch("user_management.tasks.AllocationUser")
@@ -36,7 +39,7 @@ class AddAllocationUserToGroupTests(TestCase):
         mock_AllocationUser.objects.get.return_value = self.allocation_user
         success = add_allocation_user_to_group(self.allocation_user.pk)
         mock_logger.warning.assert_called_with("Allocation is not active. Will not add user")
-        self.assertFalse(success)
+        self.assertEqual(success, {"message": "Allocation is not active. testuser not added."})
 
     @patch("user_management.tasks.AllocationUser")
     @patch("user_management.tasks.logger")
@@ -65,7 +68,7 @@ class AddAllocationUserToGroupTests(TestCase):
         mock_allocation_user.objects.get.return_value = self.allocation_user
         success = add_allocation_user_to_group(mock_allocation_user.pk)
         mock_logger.info.assert_called_with("Allocation does not have any groups. Nothing to add")
-        self.assertFalse(success)
+        self.assertEqual(success, {"message": "Allocation does not have any groups. testuser not added."})
 
 
 @override_settings(USER_MANAGEMENT_CLIENT_PATH="user_management/tests/helpers.py")
@@ -93,7 +96,10 @@ class RemoveAllocationUserFromGroupTests(TestCase):
             self.allocation_user.user, "ad_group", self.allocation_user.allocation.pk
         )
         mock_remove_user_from_group_set.assert_called_once_with(
-            "testuser", {"group1", "group2"}, error_callback=set_allocation_user_status_to_error
+            "testuser",
+            {"group1", "group2"},
+            error_callback=set_allocation_user_status_to_error,
+            callback_args=(self.allocation_user.pk,),
         )
 
     @patch("user_management.tasks.AllocationUser")

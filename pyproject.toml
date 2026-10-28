@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "coldfront-user-management-plugin"
 version = "0.0.1"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [
     { name = "Chris Barnett" }
 ]
@@ -43,6 +43,10 @@ dev = [
     "reuse>=5.0.2",
     "ruff>=0.11.4",
 ]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "user_management.tests.settings"
+testpaths = ["user_management/tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["user_management"]

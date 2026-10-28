@@ -1,12 +1,11 @@
 import logging
 
+from coldfront.core.allocation.models import Allocation, AllocationUser
+from coldfront.core.project.models import Project, ProjectUser, ProjectUserRoleChoice, ProjectUserStatusChoice
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django_auth_ldap.backend import LDAPBackend
-
-from coldfront.core.allocation.models import Allocation, AllocationUser
-from coldfront.core.project.models import Project, ProjectUser, ProjectUserRoleChoice, ProjectUserStatusChoice
 
 from user_management import utils
 
@@ -18,15 +17,17 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("-t", "--sync-to", help="Sync changes to external system", action="store_true")
-        parser.add_argument("-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False)
+        parser.add_argument(
+            "-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False
+        )
         parser.add_argument("-u", "--username", help="Check specific username")
         parser.add_argument("-g", "--group", help="Check specific group")
         parser.add_argument(
             "-d", "--dry-run", help="Only show differences. Do not run any commands.", action="store_true"
         )
-        #parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
-        #parser.add_argument("-f", "--format", help="json or csv output", default=None)
-        #parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
+        # parser.add_argument("-x", "--no-header", help="Exclude header from output", action="store_true")
+        # parser.add_argument("-f", "--format", help="json or csv output", default=None)
+        # parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
 
     def collate_project_user_data(self, group_attribute_name, include_new, group_specified=None):
         coldfront_project_users = []
@@ -36,7 +37,7 @@ class Command(BaseCommand):
             projects_with_groups = Project.objects.filter(
                 status__name__in=["Active", "New"], projectattribute__proj_attr_type__name=group_attribute_name
             ).distinct()
-        else:   
+        else:
             projects_with_groups = Project.objects.filter(
                 status__name="Active", projectattribute__proj_attr_type__name=group_attribute_name
             ).distinct()
@@ -75,7 +76,8 @@ class Command(BaseCommand):
         allocations_with_groups = None
         if include_new:
             allocations_with_groups = Allocation.objects.filter(
-                status__name__in=["Active", "New"], allocationattribute__allocation_attribute_type__name=group_attribute_name
+                status__name__in=["Active", "New"],
+                allocationattribute__allocation_attribute_type__name=group_attribute_name,
             ).distinct()
         else:
             allocations_with_groups = Allocation.objects.filter(
@@ -83,7 +85,9 @@ class Command(BaseCommand):
             ).distinct()
         self.stdout.write("Found %d allocations with groups." % allocations_with_groups.count())
         for allocation in allocations_with_groups:
-            self.stdout.write("Processing allocation %s (ID: %s)..." % (allocation.resources.first().name, allocation.pk))
+            self.stdout.write(
+                "Processing allocation %s (ID: %s)..." % (allocation.resources.first().name, allocation.pk)
+            )
             allocation_info = {
                 "allocation": allocation.resources.first().name,
                 "allocation_id": allocation.pk,
@@ -102,8 +106,11 @@ class Command(BaseCommand):
                 )
                 continue
             if len(groups) == 0:
-                logger.debug("    Allocation %s(%s) does not have any groups. Nothing to add or remove.", 
-                             allocation.resources.first().name, allocation.pk)
+                logger.debug(
+                    "    Allocation %s(%s) does not have any groups. Nothing to add or remove.",
+                    allocation.resources.first().name,
+                    allocation.pk,
+                )
                 continue
             logger.debug("    Groups from project attribute '%s': %s", group_attribute_name, groups)
             allocation_info["groups"] = list(groups)
@@ -142,7 +149,7 @@ class Command(BaseCommand):
         external_group_dict = {g["group"]: set(g["members"]) for g in external_users_and_groups}
         if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
             alignment = "project"
-        else:            
+        else:
             alignment = "allocation"
         for entry in coldfront_users_and_groups:
             groups = entry["groups"]
@@ -159,7 +166,12 @@ class Command(BaseCommand):
                             "group": group,
                             "missing_from_external": list(missing_from_external),
                             "missing_from_coldfront": list(missing_from_coldfront),
-                            "errors": [i for e in external_users_and_groups if e["group"] == group and "errors" in e for i in e['errors']],
+                            "errors": [
+                                i
+                                for e in external_users_and_groups
+                                if e["group"] == group and "errors" in e
+                                for i in e["errors"]
+                            ],
                         }
                     )
                     logger.debug(
@@ -169,7 +181,7 @@ class Command(BaseCommand):
                         len(missing_from_coldfront),
                     )
         return differences
-    
+
     def sync_to_external(self, diff, username_specified=None):
         client = utils.get_client()
         for user in diff["missing_from_external"]:
@@ -193,17 +205,17 @@ class Command(BaseCommand):
 
     def sync_to_coldfront_projects(self, diff, username_specified=None):
         if diff.get("errors", []):
-            logger.warning(
-                "Skipping sync for group %s due to errors: %s", diff["group"], "; ".join(diff["errors"])
+            logger.warning("Skipping sync for group %s due to errors: %s", diff["group"], "; ".join(diff["errors"]))
+            self.stdout.write(
+                "Skipping sync for group %s due to errors: %s" % (diff["group"], "; ".join(diff["errors"]))
             )
-            self.stdout.write("Skipping sync for group %s due to errors: %s" % (diff["group"], "; ".join(diff["errors"])))
             return
         # get the Project object
         p = Project.objects.get(pk=diff["project_id"])
         project_allocations = Allocation.objects.filter(project=p)
         active_status = ProjectUserStatusChoice.objects.get(name="Active")
         user_role = ProjectUserRoleChoice.objects.get(name="User")
-        
+
         for user in diff["missing_from_coldfront"]:
             if username_specified and user != username_specified:
                 logger.debug("  Skipping add of user %s due to username filter.", user)
@@ -217,13 +229,15 @@ class Command(BaseCommand):
                     # populate user details from LDAP
                     LDAPBackend().populate_user(user_obj)
 
-                pu, _ = ProjectUser.objects.get_or_create(project=p, user=user_obj, status=active_status, role=user_role)
+                pu, _ = ProjectUser.objects.get_or_create(
+                    project=p, user=user_obj, status=active_status, role=user_role
+                )
 
                 for allocation in project_allocations:
                     allocation.add_user(user_obj)
             except Exception as e:
                 self.stdout.write("Failed to add user %s to project %s: %s" % (user, diff["project"], e))
-        
+
         # remove users from project
         project_users = ProjectUser.objects.filter(project=p)
         project_allocations = Allocation.objects.filter(project=p)
@@ -240,8 +254,8 @@ class Command(BaseCommand):
                     if pu.user.username == user:
                         pu.status = removed_status
                         pu.save()
-                
-                user_obj= User.objects.get(username=user)
+
+                user_obj = User.objects.get(username=user)
                 for allocation in project_allocations:
                     allocation.remove_user(user_obj)
             except Exception as e:
@@ -280,9 +294,7 @@ class Command(BaseCommand):
                         au.status = "Removed"
                         au.save()
             except Exception as e:
-                self.stdout.write(
-                    "Failed to remove user %s from allocation %s: %s" % (user, diff["allocation"], e)
-                )
+                self.stdout.write("Failed to remove user %s from allocation %s: %s" % (user, diff["allocation"], e))
 
     def sync_to_coldfront(self, diff, username_specified=None):
         if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
@@ -294,7 +306,7 @@ class Command(BaseCommand):
         username_specified = options.get("username", None)
         group_specified = options.get("group", None)
         dry_run = options.get("dry_run", False)
-        #no_header = options.get("no_header", False)
+        # no_header = options.get("no_header", False)
         sync_to = options.get("sync_to", False)
         include_new = options.get("include_new", False)
 
@@ -304,20 +316,24 @@ class Command(BaseCommand):
             self.stdout.write("Filtering to group: %s" % group_specified)
         if dry_run:
             self.stdout.write("Dry run mode enabled. No changes will be made.")
-        #if no_header:
-       #     self.stdout.write("No header mode enabled. Header will be excluded from output.")
+        # if no_header:
+        #     self.stdout.write("No header mode enabled. Header will be excluded from output.")
 
         # get list of groups from coldfront mapped to projects/allocations
         # determine whether to sync at the project or allocation level
         group_attribute_name = settings.UNIX_GROUP_ATTRIBUTE_NAME
         if settings.MANAGE_GROUPS_AT_PROJECT_LEVEL:
             self.stdout.write("Managing groups at the project level...")
-            coldfront_users_and_groups = self.collate_project_user_data(group_attribute_name, include_new,group_specified)
+            coldfront_users_and_groups = self.collate_project_user_data(
+                group_attribute_name, include_new, group_specified
+            )
 
         else:
             self.stdout.write("Managing groups at the allocation level...")
             # get allocation users mapped to groups and allocations
-            coldfront_users_and_groups = self.collate_allocation_user_data(group_attribute_name, include_new, group_specified)
+            coldfront_users_and_groups = self.collate_allocation_user_data(
+                group_attribute_name, include_new, group_specified
+            )
 
         group_set = set([n for sub in coldfront_users_and_groups for n in sub["groups"]])
         # query external system for members of each group
@@ -341,8 +357,12 @@ class Command(BaseCommand):
                     try:
                         self.sync_to_coldfront(diff, username_specified)
                     except Exception as e:
-                        self.stdout.write("Failed syncing user %s to Coldfront: %s", username_specified, e)
-                        self.stdout.write(diff)
+                        # one project or allocation failing shouldn't stop the rest of the sync
+                        kind = "project" if "project" in diff else "allocation"
+                        self.stderr.write(
+                            f"Failed syncing {kind} {diff.get(kind)} (ID: {diff.get(f'{kind}_id')}), "
+                            f"group {diff.get('group')}, to ColdFront: {type(e).__name__}: {e}"
+                        )
             self.stdout.write("Sync complete.")
         else:
             self.stdout.write("Dry run complete. No changes were made.")
