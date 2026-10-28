@@ -22,7 +22,9 @@ class Command(BaseCommand):
             choices=["project", "allocation"],
             required=False,
         )
-        parser.add_argument("-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False)
+        parser.add_argument(
+            "-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False
+        )
         parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
         parser.add_argument("-f", "--format", help="json or csv output", default=None)
 
@@ -89,7 +91,9 @@ class Command(BaseCommand):
                 )
         return info
 
-    def get_group_attribute_info_for_allocations(self, group_attribute_name: str, include_new: bool = False) -> list[dict]:
+    def get_group_attribute_info_for_allocations(
+        self, group_attribute_name: str, include_new: bool = False
+    ) -> list[dict]:
         logger.info("Getting group attribute info at the allocation level...")
         info = []
         # get a list of allocations
@@ -104,8 +108,11 @@ class Command(BaseCommand):
                 allocation_attribute_type__name=group_attribute_name
             )
             if allocation_attributes.exists():
-                logger.info("  Allocation %s:%s has group attribute defined.", 
-                            allocation.project.title, allocation.resources.first().name)
+                logger.info(
+                    "  Allocation %s:%s has group attribute defined.",
+                    allocation.project.title,
+                    allocation.resources.first().name,
+                )
                 info.append(
                     {
                         "project": allocation.project.title,
@@ -118,8 +125,9 @@ class Command(BaseCommand):
 
             else:
                 logger.info(
-                    "  Allocation %s(%s) does not have group attribute defined.", 
-                    allocation.resources.first().name, allocation.pk
+                    "  Allocation %s(%s) does not have group attribute defined.",
+                    allocation.resources.first().name,
+                    allocation.pk,
                 )
                 info.append(
                     {

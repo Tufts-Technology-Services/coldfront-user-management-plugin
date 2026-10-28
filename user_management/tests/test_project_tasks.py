@@ -77,8 +77,13 @@ class RemoveProjectUserFromGroupTests(TestCase):
     @patch("user_management.utils.get_project_attribute_values_set")
     @patch("user_management.utils.collect_other_project_user_groups")
     @patch("user_management.tasks.ProjectUser")
-    def test_success(self, mock_project_user, mock_collect_other_project_user_groups, 
-                     mock_get_project_attribute_values_set, mock_remove_user_from_group_set):
+    def test_success(
+        self,
+        mock_project_user,
+        mock_collect_other_project_user_groups,
+        mock_get_project_attribute_values_set,
+        mock_remove_user_from_group_set,
+    ):
         self.project_user.status.name = "Removed"
         self.project_user.project.status.name = "Active"
         mock_get_project_attribute_values_set.return_value = {"group1", "group2"}
@@ -137,8 +142,13 @@ class RemoveAllUsersFromProjectGroupsTests(TestCase):
     @patch("user_management.utils.get_project_attribute_values_set")
     @patch("user_management.utils.collect_other_project_user_groups")
     @patch("user_management.tasks.Project")
-    def test_success(self, mock_project, mock_collect_other_project_user_groups, 
-                     mock_get_project_attribute_values_set, mock_remove_user_from_group_set):
+    def test_success(
+        self,
+        mock_project,
+        mock_collect_other_project_user_groups,
+        mock_get_project_attribute_values_set,
+        mock_remove_user_from_group_set,
+    ):
         self.project.status.name = "Archived"
         mock_get_project_attribute_values_set.return_value = {"group1", "group2"}
         mock_project.objects.get.return_value = self.project
@@ -189,9 +199,11 @@ class RemoveAllUsersFromProjectGroupsTests(TestCase):
     @patch("user_management.utils.collect_other_project_user_groups")
     @patch("user_management.tasks.Project")
     def test_no_groups_to_remove(
-        self, mock_project, mock_collect_other_project_user_groups, 
-        mock_get_project_attribute_values_set, 
-        mock_remove_user_from_group_set
+        self,
+        mock_project,
+        mock_collect_other_project_user_groups,
+        mock_get_project_attribute_values_set,
+        mock_remove_user_from_group_set,
     ):
         self.project.status.name = "Archived"
         mock_get_project_attribute_values_set.return_value = {"group1", "group2"}

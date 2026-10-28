@@ -26,7 +26,9 @@ class Command(BaseCommand):
             choices=["project", "allocation"],
             required=False,
         )
-        parser.add_argument("-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False)
+        parser.add_argument(
+            "-n", "--include-new", help="Include 'New' projects or allocations", action="store_true", default=False
+        )
         parser.add_argument("-i", "--input-file", help="Path to input file containing group mappings", required=True)
         parser.add_argument("-o", "--output-file", help="Path to output file for saving group updates", required=True)
         parser.add_argument(
@@ -67,10 +69,12 @@ class Command(BaseCommand):
             if group is None or group.strip() == "":
                 logger.warning("Skipping row with empty group: %s", row)
                 continue
-            
+
             if allocation_id is not None and allocation_id.strip() != "":
                 group_mappings[allocation_id.strip()] = group
-            elif (project is not None and project.strip() != "") and (pi_username is not None and pi_username.strip() != ""):
+            elif (project is not None and project.strip() != "") and (
+                pi_username is not None and pi_username.strip() != ""
+            ):
                 group_mappings[f"{project}_{pi_username}".lower().strip()] = group
             else:
                 logger.warning("Skipping invalid row: %s", row)
@@ -236,7 +240,9 @@ class Command(BaseCommand):
                     )
             else:
                 logger.info(
-                    "  Allocation %s(%s) does not have group attribute defined.", allocation.resources.first().name, allocation.pk
+                    "  Allocation %s(%s) does not have group attribute defined.",
+                    allocation.resources.first().name,
+                    allocation.pk,
                 )
                 if not dry_run:
                     # create the AllocationAttribute with the value from passed argument
@@ -346,7 +352,7 @@ class Command(BaseCommand):
 
         input_file = options.get("input_file")
         group_mappings = self.handle_input_file(input_file)
-        
+
         output_file = options.get("output_file")
         if not output_file:
             logger.error("Output file is required.")
@@ -369,7 +375,6 @@ class Command(BaseCommand):
             logger.info("Setting group attribute at the project level...")
             project_attribute_type = self.get_project_attribute_type(group_attribute_name, dry_run)
             self.set_group_attribute_for_projects(project_attribute_type, group_mappings, include_new, dry_run)
-
 
         else:
             logger.info("Setting group attribute at the allocation level...")

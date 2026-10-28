@@ -1,6 +1,6 @@
 import logging
 
-from coldfront.core.allocation.models import AllocationUser, Allocation
+from coldfront.core.allocation.models import Allocation, AllocationUser
 from coldfront.core.allocation.utils import set_allocation_user_status_to_error
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserStatusChoice
 
@@ -37,9 +37,10 @@ def add_allocation_user_to_group(user_pk):
         "DEBUG: calling add_user_to_group_set for user %s and groups %s", allocation_user.user.username, groups
     )
     return utils.add_user_to_group_set(
-        allocation_user.user.username, groups, 
+        allocation_user.user.username,
+        groups,
         error_callback=set_allocation_user_status_to_error,
-        callback_args=(allocation_user.pk,)
+        callback_args=(allocation_user.pk,),
     )  # for allocation: set_allocation_user_status_to_error(user_pk) on error
 
 
@@ -59,16 +60,17 @@ def add_project_user_to_group(user_pk):
     if project_user.status.name != "Active":
         logger.warning("Project user status is not 'Active'. Will not add user.")
         return {"message": f"Project user status is not 'Active'. {project_user.user.username} not added."}
-    
+
     groups = utils.get_project_attribute_values_set(project_user.project, UNIX_GROUP_ATTRIBUTE_NAME)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to add")
         return {"message": f"Project does not have any groups. {project_user.user.username} not added."}
 
     return utils.add_user_to_group_set(
-        project_user.user.username, groups, 
+        project_user.user.username,
+        groups,
         error_callback=utils.set_project_user_status_to_pending,
-        callback_args=(project_user.pk,)
+        callback_args=(project_user.pk,),
     )
 
 
@@ -77,7 +79,9 @@ def add_project_user_to_allocations(user_pk):
     Adds the user to all allocations in the project that the project user belongs to. This is necessary when group membership is managed at the project level
     """
     project_user = ProjectUser.objects.get(pk=user_pk)
-    logger.info("Adding user %s to active allocations in project %s", project_user.user.username, project_user.project.title)
+    logger.info(
+        "Adding user %s to active allocations in project %s", project_user.user.username, project_user.project.title
+    )
     allocations = Allocation.objects.filter(project=project_user.project, status__name="Active")
     for alloc in allocations.iterator():
         logger.debug("Adding user %s to allocation %s", project_user.user.username, alloc.pk)
@@ -124,12 +128,15 @@ def remove_allocation_user_from_group(user_pk):
             "No groups to remove. User may belong to these groups in other active allocations: %s",
             set(groups).intersection(other_groups),
         )
-        return {"message": f"No groups to remove user from. {allocation_user.user.username} may belong to these groups in other active allocations: {set(groups).intersection(other_groups)}"}
+        return {
+            "message": f"No groups to remove user from. {allocation_user.user.username} may belong to these groups in other active allocations: {set(groups).intersection(other_groups)}"
+        }
 
     return utils.remove_user_from_group_set(
-        allocation_user.user.username, group_diff, 
+        allocation_user.user.username,
+        group_diff,
         error_callback=set_allocation_user_status_to_error,
-        callback_args=(allocation_user.pk,)
+        callback_args=(allocation_user.pk,),
     )  # for allocation: set_allocation_user_status_to_error(user_pk) on error
 
 
@@ -168,12 +175,15 @@ def remove_project_user_from_group(user_pk):
         logger.info(
             "No groups to remove. User may belong to these groups in other active or new projects: %s", other_groups
         )
-        return {"message": f"No groups to remove for user {project_user.user.username}. User may belong to these groups in other active or new projects: {other_groups}"}
+        return {
+            "message": f"No groups to remove for user {project_user.user.username}. User may belong to these groups in other active or new projects: {other_groups}"
+        }
 
     return utils.remove_user_from_group_set(
-        project_user.user.username, group_diff, 
+        project_user.user.username,
+        group_diff,
         error_callback=utils.set_project_user_status_to_pending,
-        callback_args=(project_user.pk,)
+        callback_args=(project_user.pk,),
     )
 
 
@@ -188,12 +198,12 @@ def remove_all_project_users_from_groups(project_pk):
     project = Project.objects.get(pk=project_pk)
     if project.status.name != "Archived":
         logger.warning("Project is not archived. Will not remove users from groups")
-        return {"message": f"Project is not archived. Users not removed from groups."}
+        return {"message": "Project is not archived. Users not removed from groups."}
 
     groups = utils.get_project_attribute_values_set(project, UNIX_GROUP_ATTRIBUTE_NAME)
     if len(groups) == 0:
         logger.info("Project does not have any groups. Nothing to remove")
-        return {"message": f"Project does not have any groups. Users not removed from groups."}
+        return {"message": "Project does not have any groups. Users not removed from groups."}
 
     project_users = ProjectUser.objects.filter(project__pk=project_pk)
     for project_user in project_users:
@@ -209,9 +219,10 @@ def remove_all_project_users_from_groups(project_pk):
             )
             continue
         utils.remove_user_from_group_set(
-            project_user.user.username, group_diff, 
+            project_user.user.username,
+            group_diff,
             error_callback=utils.set_project_user_status_to_pending,
-            callback_args=(project_user.pk,)
+            callback_args=(project_user.pk,),
         )
 
     # remove PI from project groups as well
@@ -239,7 +250,8 @@ def sync_project_users_from_external(project_pk):
         return
     if len(groups) > 1:
         logger.warning(
-            "Project has multiple groups defined. This is not supported. Will sync users from the first group only: %s", groups
+            "Project has multiple groups defined. This is not supported. Will sync users from the first group only: %s",
+            groups,
         )
     group = list(groups)[0]
     usernames = set()
@@ -250,11 +262,16 @@ def sync_project_users_from_external(project_pk):
         group_members = client.get_group_members(group)
         usernames.update(group_members)
 
-    project_users = list(ProjectUser.objects.filter(project__pk=project_pk).values_list("user__username", flat=True).distinct())
-    project_users.append(project.pi.username) # ensure PI is included in project users
+    project_users = list(
+        ProjectUser.objects.filter(project__pk=project_pk).values_list("user__username", flat=True).distinct()
+    )
+    project_users.append(project.pi.username)  # ensure PI is included in project users
     missing_users = usernames - set(project_users)
     for username in missing_users:
-        logger.info("User %s is a member of project group(s) but does not have an active project user record. Creating project user.", username)
+        logger.info(
+            "User %s is a member of project group(s) but does not have an active project user record. Creating project user.",
+            username,
+        )
         utils.create_project_user_from_username(username, project)
 
 
@@ -268,11 +285,12 @@ def sync_all_project_users_from_external():
 
 def sync_project_users_to_allocations(allocation_id):
     """
-    Syncs users in active projects to all active allocations in the project. This is necessary when 
+    Syncs users in active projects to all active allocations in the project. This is necessary when
     group membership is managed at the project level
     """
     allocation = Allocation.objects.get(id=allocation_id)
-    pusers = ProjectUser.objects.filter(project=allocation.project, status=ProjectUserStatusChoice.objects.get(name="Active"))
+    pusers = ProjectUser.objects.filter(
+        project=allocation.project, status=ProjectUserStatusChoice.objects.get(name="Active")
+    )
     for u in pusers:
         add_project_user_to_allocations(u.id)
-    

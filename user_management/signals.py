@@ -1,10 +1,8 @@
 import logging
 
-from coldfront.core.allocation.signals import (allocation_activate_user, 
-                                               allocation_remove_user, 
-                                               allocation_activate)
+from coldfront.core.allocation.signals import allocation_activate, allocation_activate_user, allocation_remove_user
 from coldfront.core.project.signals import project_activate_user, project_archive, project_remove_user
-from django_q.tasks import async_task, async_chain
+from django_q.tasks import async_chain, async_task
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +23,7 @@ def init_signal_receivers(project_level=False, remove_on_archive=False):
         )  # dispatch_uid to avoid duplicate connections
         project_remove_user.connect(remove_project_user, dispatch_uid="ump_remove_project_user_1")
 
-        allocation_activate.connect(
-            sync_project_users, dispatch_uid="ump_sync_project_users_to_allocations_1"
-        )
+        allocation_activate.connect(sync_project_users, dispatch_uid="ump_sync_project_users_to_allocations_1")
         if remove_on_archive:
             logger.warning(
                 "User Management is configured to remove users on project archive. This will remove all users from their groups when a project is archived."
@@ -62,8 +58,12 @@ def remove_allocation_user(sender, **kwargs):
 
 def activate_project_user(sender, **kwargs):
     user_pk = kwargs.get("project_user_pk")
-    async_chain([("user_management.tasks.add_project_user_to_group", [user_pk]),
-                 ("user_management.tasks.add_project_user_to_allocations", [user_pk])])
+    async_chain(
+        [
+            ("user_management.tasks.add_project_user_to_group", [user_pk]),
+            ("user_management.tasks.add_project_user_to_allocations", [user_pk]),
+        ]
+    )
 
 
 def remove_project_user(sender, **kwargs):
