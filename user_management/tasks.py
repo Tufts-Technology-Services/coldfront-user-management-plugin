@@ -74,18 +74,36 @@ def add_project_user_to_group(user_pk):
     )
 
 
-def add_project_user_to_allocations(user_pk):
+def add_project_user_to_allocations(user_pk, allocation_pks=None):
     """
-    Adds the user to all allocations in the project that the project user belongs to. This is necessary when group membership is managed at the project level
+    Adds the project user to the project's active allocations: all of them, or those in
+    `allocation_pks`. This is necessary when group membership is managed at the project level.
+
+    Allocations the user is already Active on are skipped. ColdFront signalled
+    allocation_activate_user when they were activated there, and Allocation.add_user() signals
+    again even when nothing changes, so adding them again would repeat everything that signal
+    triggers, such as the storage plugin's folder creation.
     """
     project_user = ProjectUser.objects.get(pk=user_pk)
-    logger.info(
-        "Adding user %s to active allocations in project %s", project_user.user.username, project_user.project.title
-    )
+    username = project_user.user.username
+    logger.info("Adding user %s to active allocations in project %s", username, project_user.project.title)
     allocations = Allocation.objects.filter(project=project_user.project, status__name="Active")
-    for alloc in allocations.iterator():
-        logger.debug("Adding user %s to allocation %s", project_user.user.username, alloc.pk)
+    if allocation_pks is not None:
+        allocations = allocations.filter(pk__in=allocation_pks)
+    already_active = set(
+        AllocationUser.objects.filter(
+            user=project_user.user, allocation__in=allocations, status__name="Active"
+        ).values_list("allocation_id", flat=True)
+    )
+    added = []
+    for alloc in allocations.exclude(pk__in=already_active).iterator():
+        logger.debug("Adding user %s to allocation %s", username, alloc.pk)
         alloc.add_user(project_user.user)
+        added.append(alloc.pk)
+    return {
+        "message": f"Added {username} to allocations {added or 'none'}; "
+        f"already active on {sorted(already_active) or 'none'}."
+    }
 
 
 def remove_allocation_user_from_group(user_pk):
@@ -285,12 +303,12 @@ def sync_all_project_users_from_external():
 
 def sync_project_users_to_allocations(allocation_id):
     """
-    Syncs users in active projects to all active allocations in the project. This is necessary when
-    group membership is managed at the project level
+    Adds the project's active users to a newly activated allocation. Only to that allocation:
+    the project's other allocations already have their users.
     """
     allocation = Allocation.objects.get(id=allocation_id)
     pusers = ProjectUser.objects.filter(
         project=allocation.project, status=ProjectUserStatusChoice.objects.get(name="Active")
     )
     for u in pusers:
-        add_project_user_to_allocations(u.id)
+        add_project_user_to_allocations(u.id, allocation_pks=[allocation_id])

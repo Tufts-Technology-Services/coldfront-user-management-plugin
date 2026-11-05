@@ -33,11 +33,10 @@ def init_signal_receivers(project_level=False, remove_on_archive=False):
     else:  # allocation level
         logger.debug("Initializing allocation-level signal receivers for User Management...")
         # connect signals to allocation user management views
+        # once each: a dispatch_uid only stops the same uid connecting twice, so a receiver
+        # connected under two uids runs twice, and queued its group task twice
         allocation_activate_user.connect(activate_allocation_user, dispatch_uid="ump_activate_allocation_user_1")
-        allocation_activate_user.connect(activate_allocation_user, dispatch_uid="ump_activate_allocation_user_2")
         allocation_remove_user.connect(remove_allocation_user, dispatch_uid="ump_remove_allocation_user_1")
-        allocation_remove_user.connect(remove_allocation_user, dispatch_uid="ump_remove_allocation_user_2")
-        allocation_remove_user.connect(remove_allocation_user, dispatch_uid="ump_remove_allocation_user_3")
 
         if remove_on_archive:
             logger.warning(
