@@ -11,6 +11,8 @@ from coldfront.config.settings import *  # noqa: F403
 INSTALLED_APPS += ["user_management"]  # noqa: F405
 
 DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
+# a deliberately weak hasher: creating users is much faster, and nothing here checks its strength
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 UNIX_GROUP_ATTRIBUTE_NAME = "ad_group"
 # the in-memory stand-in for Grouper, rather than the real client
