@@ -4,11 +4,12 @@ import logging
 import sys
 from pathlib import Path
 
+from django.conf import settings
+from django.contrib.auth.models import User
+
 from coldfront.core.allocation.models import Allocation
 from coldfront.core.project.models import Project, ProjectUser, ProjectUserRoleChoice, ProjectUserStatusChoice
 from coldfront.plugins.ldap_user_search.utils import LDAPUserSearch
-from django.conf import settings
-from django.contrib.auth.models import User
 
 from .constants import UNIX_GROUP_ATTRIBUTE_NAME
 from .user_management_client import UserManagementClient

@@ -1,8 +1,9 @@
 from unittest.mock import patch
 
+from django.test import TestCase, override_settings
+
 from coldfront.core.project.models import ProjectUserStatusChoice
 from coldfront.core.test_helpers.factories import ProjectFactory, ProjectUserFactory, UserFactory
-from django.test import TestCase, override_settings
 
 from user_management.tasks import (
     add_project_user_to_group,

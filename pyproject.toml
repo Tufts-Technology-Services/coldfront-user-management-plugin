@@ -39,6 +39,7 @@ dev = [
     "django-sslserver>=0.22",
     "factory-boy>=3.3.3",
     "faker>=37.1.0",
+    "pre-commit>=4.7.0",
     "pytest-django>=4.11.1",
     "reuse>=5.0.2",
     "ruff>=0.11.4",
@@ -60,10 +61,15 @@ explicit = true
 [tool.ruff]
 line-length = 120
 indent-width = 4
-target-version = "py312"
+target-version = "py312"  # the oldest Python in requires-python
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "S308"]
+select = ["E4", "E7", "E9", "F", "I", "S308", "S113"]
+
+[tool.ruff.lint.isort]
+# coldfront's imports get a section of their own, between third-party and this package's
+sections = { "coldfront-main" = ["coldfront"] }
+section-order = ["future", "standard-library", "third-party", "coldfront-main", "first-party", "local-folder"]
 
 [tool.ruff.format]
 indent-style = "space"

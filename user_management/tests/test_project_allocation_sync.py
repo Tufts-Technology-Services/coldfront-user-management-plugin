@@ -8,6 +8,8 @@ new allocation and every new project member.
 
 from unittest.mock import call, patch
 
+from django.test import TestCase
+
 from coldfront.core.allocation.models import Allocation
 from coldfront.core.allocation.signals import allocation_activate_user, allocation_remove_user
 from coldfront.core.test_helpers.factories import (
@@ -18,7 +20,6 @@ from coldfront.core.test_helpers.factories import (
     ProjectFactory,
     ProjectUserFactory,
 )
-from django.test import TestCase
 
 from user_management.signals import init_signal_receivers
 from user_management.tasks import add_project_user_to_allocations, sync_project_users_to_allocations
