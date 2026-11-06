@@ -11,7 +11,7 @@ The User Management Plugin provides an interface for managing user group members
 2. Copy `user_management.py` to the `coldfront/config/plugins/` directory in your ColdFront project.
 3. Update `coldfront/config/settings.py` with the following:
 ```python
-plugin_configs['PLUGIN_USER_MANAGEMENT'] = 'plugins/user_management.py'
+plugin_configs["PLUGIN_USER_MANAGEMENT"] = "plugins/user_management.py"
 ```
 4. Add the following to your environment variables (e.g., in `/etc/coldfront/coldfront.env`):
 ```

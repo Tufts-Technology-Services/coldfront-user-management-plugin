@@ -1,8 +1,9 @@
 import logging
 
+from django_q.tasks import async_chain, async_task
+
 from coldfront.core.allocation.signals import allocation_activate, allocation_activate_user, allocation_remove_user
 from coldfront.core.project.signals import project_activate_user, project_archive, project_remove_user
-from django_q.tasks import async_chain, async_task
 
 logger = logging.getLogger(__name__)
 

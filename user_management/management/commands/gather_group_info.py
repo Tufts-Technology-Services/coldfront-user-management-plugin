@@ -3,10 +3,11 @@ import json
 import logging
 import os
 
-import coldfront.core.allocation.models as allocation_models
-import coldfront.core.project.models as project_models
 from django.conf import settings
 from django.core.management.base import BaseCommand
+
+import coldfront.core.allocation.models as allocation_models
+import coldfront.core.project.models as project_models
 
 logger = logging.getLogger(__name__)
 

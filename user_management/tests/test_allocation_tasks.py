@@ -1,8 +1,9 @@
 from unittest.mock import patch
 
+from django.test import TestCase, override_settings
+
 from coldfront.core.allocation.utils import set_allocation_user_status_to_error
 from coldfront.core.test_helpers.factories import AllocationUserFactory
-from django.test import TestCase, override_settings
 
 from user_management.tasks import add_allocation_user_to_group, remove_allocation_user_from_group
 
@@ -19,8 +20,8 @@ class AddAllocationUserToGroupTests(TestCase):
     def test_success(self, mock_add_user_to_group_set, mock_AllocationUser):
         self.allocation_user.status.name = "Active"
         self.allocation_user.allocation.status.name = "Active"
-        self.allocation_user.allocation.get_attribute_list = (
-            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        self.allocation_user.allocation.get_attribute_list = lambda group_attr_name: (
+            ["group1", "group2"] if group_attr_name == "ad_group" else []
         )
         mock_AllocationUser.objects.get.return_value = self.allocation_user
         mock_add_user_to_group_set.return_value = None
@@ -86,8 +87,8 @@ class RemoveAllocationUserFromGroupTests(TestCase):
     ):
         self.allocation_user.status.name = "Removed"
         self.allocation_user.allocation.status.name = "Active"
-        self.allocation_user.allocation.get_attribute_list = (
-            lambda group_attr_name: ["group1", "group2"] if group_attr_name == "ad_group" else []
+        self.allocation_user.allocation.get_attribute_list = lambda group_attr_name: (
+            ["group1", "group2"] if group_attr_name == "ad_group" else []
         )
         mock_allocation_user.objects.get.return_value = self.allocation_user
         mock_collect_other_allocation_user_groups.return_value = []

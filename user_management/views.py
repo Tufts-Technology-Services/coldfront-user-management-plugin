@@ -1,8 +1,9 @@
-from coldfront.core.project.models import Project, ProjectUser
 from django.contrib.auth.decorators import user_passes_test
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_GET, require_POST
+
+from coldfront.core.project.models import Project, ProjectUser
 
 from user_management.utils import create_project_user_from_username, get_project_group_members_from_external
 
