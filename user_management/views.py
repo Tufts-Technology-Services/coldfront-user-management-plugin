@@ -5,7 +5,11 @@ from django.views.decorators.http import require_GET, require_POST
 
 from coldfront.core.project.models import Project, ProjectUser
 
-from user_management.utils import create_project_user_from_username, get_project_group_members_from_external
+from user_management.utils import (
+    UserNotInDirectoryError,
+    create_project_user_from_username,
+    get_project_group_members_from_external,
+)
 
 
 @require_GET
@@ -41,7 +45,12 @@ def add_group_members_from_external(request, project_id) -> list[str]:
     project_users = ProjectUser.objects.filter(project_id=project_id, status__name="Active").distinct()
     missing_members = ext_members - set(project_users.values_list("user__username", flat=True))
     project = Project.objects.get(pk=project_id)
-    for username in missing_members:
-        members.append({"username": username})
-        create_project_user_from_username(username, project, role="User", status="Active")
-    return JsonResponse({"members_added": members, "group": group}, status=200)
+    skipped = []
+    for username in sorted(member for member in missing_members if member):
+        try:
+            create_project_user_from_username(username, project, role="User", status="Active")
+        except UserNotInDirectoryError:
+            skipped.append({"username": username, "reason": "not in the directory"})
+        else:
+            members.append({"username": username})
+    return JsonResponse({"members_added": members, "skipped": skipped, "group": group}, status=200)
