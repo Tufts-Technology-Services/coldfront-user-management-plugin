@@ -164,20 +164,30 @@ def collect_other_project_user_groups(user, group_attribute_name, current_projec
     return set(other_groups)
 
 
+class UserNotInDirectoryError(Exception):
+    """The directory (LDAP) has no account for a username, so it isn't added to a project."""
+
+
 def create_project_user_from_username(username, project, role="User", status="Active"):
+    """
+    Make `username` a member of `project`, creating their ColdFront user if there isn't one yet.
+
+    Only for people the directory (LDAP) knows: for any other username it raises
+    UserNotInDirectoryError and creates nothing, whether or not ColdFront already has a user by that
+    name. An external group can list usernames that aren't real accounts, such as one parsed
+    wrongly from a display name, or someone who has left.
+    """
+    results = LDAPUserSearch("", "").search_a_user(username, "username_only")
+    if not results:
+        raise UserNotInDirectoryError(f"The directory has no account for {username}.")
+
     user_obj, created = User.objects.get_or_create(username=username)
     if created:
-        # populate user details from LDAP
-        user_search = LDAPUserSearch("", "")
-        results = user_search.search_a_user(username, "username_only")
-        if not results:
-            logger.error("User %s not found in LDAP. User will be created with default values.", username)
-        else:
-            user_info = results[0]
-            user_obj.first_name = user_info.get("first_name", "")
-            user_obj.last_name = user_info.get("last_name", "")
-            user_obj.email = user_info.get("email", "")
-            user_obj.save()
+        user_info = results[0]
+        user_obj.first_name = user_info.get("first_name", "")
+        user_obj.last_name = user_info.get("last_name", "")
+        user_obj.email = user_info.get("email", "")
+        user_obj.save()
 
     pu_role = ProjectUserRoleChoice.objects.get(name=role)
     pu_status = ProjectUserStatusChoice.objects.get(name=status)

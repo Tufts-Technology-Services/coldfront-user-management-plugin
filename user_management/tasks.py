@@ -280,25 +280,60 @@ def sync_project_users_from_external(project_pk):
         group_members = client.get_group_members(group)
         usernames.update(group_members)
 
+    if None in usernames:
+        # the client gives None for a member whose username it couldn't read
+        logger.warning("Group %s has members whose username couldn't be read. Skipping them.", group)
+        usernames.discard(None)
+
     project_users = list(
         ProjectUser.objects.filter(project__pk=project_pk).values_list("user__username", flat=True).distinct()
     )
     project_users.append(project.pi.username)  # ensure PI is included in project users
     missing_users = usernames - set(project_users)
-    for username in missing_users:
+    added, skipped = [], []
+    for username in sorted(missing_users):
         logger.info(
             "User %s is a member of project group(s) but does not have an active project user record. Creating project user.",
             username,
         )
-        utils.create_project_user_from_username(username, project)
+        try:
+            utils.create_project_user_from_username(username, project)
+        except utils.UserNotInDirectoryError:
+            # e.g. a username parsed wrongly from Grouper, or someone who has left: not a ColdFront user to make
+            logger.warning("Group %s lists %s, whom the directory doesn't know. Not adding them.", group, username)
+            skipped.append(username)
+        else:
+            added.append(username)
+    return {
+        "message": f"Added {len(added)} and skipped {len(skipped)} of group {group}'s members to {project.title}.",
+        "added": added,
+        "skipped": skipped,
+    }
 
 
 def sync_all_project_users_from_external():
     """
     Sync all users and groups for all projects with the external system.
+
+    The result names, per project title, the members added and those skipped because the directory
+    doesn't know them. Projects with neither are left out.
     """
+    added, skipped = {}, {}
     for project in Project.objects.all():
-        sync_project_users_from_external(project.pk)
+        result = sync_project_users_from_external(project.pk)
+        if not result:
+            continue
+        if result["added"]:
+            added[project.title] = result["added"]
+        if result["skipped"]:
+            skipped[project.title] = result["skipped"]
+    added_count = sum(len(usernames) for usernames in added.values())
+    skipped_count = sum(len(usernames) for usernames in skipped.values())
+    return {
+        "message": f"Added {added_count} and skipped {skipped_count} external group members across all projects.",
+        "added": added,
+        "skipped": skipped,
+    }
 
 
 def sync_project_users_to_allocations(allocation_id):
