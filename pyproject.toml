@@ -41,6 +41,7 @@ dev = [
     "faker>=37.1.0",
     "pre-commit>=4.7.0",
     "pytest-django>=4.11.1",
+    "pytest-xdist>=3.8.0",
     "reuse>=5.0.2",
     "ruff>=0.11.4",
 ]
