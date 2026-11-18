@@ -1,18 +1,68 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from user_management.tests.helpers import UserManagementClient
 from user_management.utils import (
     AlreadyMemberError,
     GroupDoesNotExistError,
+    GroupNameNotLowercaseError,
     NotMemberError,
     _add_user_to_group,
     _remove_user_from_group,
     add_user_to_group_set,
     remove_user_from_group_set,
 )
+
+
+class TestNewGroupNamesAreLowercase(TestCase):
+    """Creating a group checks its name is lowercase, unless USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES is
+    False. Groups that already exist keep their case: some older projects' groups are mixed case."""
+
+    def test_a_mixed_case_group_is_not_created_by_default(self):
+        client = UserManagementClient()
+
+        with pytest.raises(GroupNameNotLowercaseError, match="SmithLab"):
+            _add_user_to_group("alice", "SmithLab", client)
+
+        assert not client.group_exists("SmithLab")
+        assert not client.user_in_group("alice", "SmithLab")
+
+    def test_a_lowercase_group_is_created(self):
+        client = UserManagementClient()
+
+        _add_user_to_group("alice", "smithlab", client)
+
+        assert client.user_in_group("alice", "smithlab")
+
+    def test_a_user_is_added_to_an_existing_mixed_case_group(self):
+        client = UserManagementClient()
+        client.create_group("VET_RSCH_TZIPORILAB")
+
+        _add_user_to_group("alice", "VET_RSCH_TZIPORILAB", client)
+
+        assert client.user_in_group("alice", "VET_RSCH_TZIPORILAB")
+
+    @override_settings(USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES=False)
+    def test_a_mixed_case_group_is_created_when_not_required(self):
+        client = UserManagementClient()
+
+        _add_user_to_group("alice", "SmithLab", client)
+
+        assert client.user_in_group("alice", "SmithLab")
+
+    def test_a_refused_group_is_a_failed_addition(self):
+        """So the task's usual failure handling applies: the error callback sets the member to Pending."""
+        client = UserManagementClient()
+        error_callback = MagicMock()
+
+        with patch("user_management.utils.get_client", return_value=client):
+            result = add_user_to_group_set("alice", {"SmithLab", "smithlab"}, error_callback=error_callback)
+
+        assert result["failed_additions"] == ["SmithLab"]
+        assert result["successful_additions"] == ["smithlab"]
+        error_callback.assert_called_once_with()
 
 
 class TestUserManagementUtils(TestCase):
