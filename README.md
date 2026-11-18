@@ -23,6 +23,13 @@ USER_MANAGEMENT_ENABLE_SIGNALS=True  # plugin won't listen to Coldfront signals 
 MANAGE_GROUPS_AT_PROJECT_LEVEL=False  # if True, groups are managed at the project level; if False, at the allocation level
 USER_MANAGEMENT_REMOVE_USERS_ON_PROJECT_ARCHIVE=False
 ```
+5. Optionally, allow new groups with mixed-case names, in `local_settings.py`:
+```python
+USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES = False  # default True
+```
+When a user is added to a group that doesn't exist yet, the plugin creates it. By default it won't create
+one whose name isn't lowercase: adding the user fails, as any other failure to add them does. Groups that
+already exist keep whatever case they have, and users are added to them as before.
 
 ## Implementing a New Client
 

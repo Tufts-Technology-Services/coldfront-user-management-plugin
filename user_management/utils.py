@@ -29,6 +29,16 @@ class GroupDoesNotExistError(Exception):
     pass
 
 
+class GroupNameNotLowercaseError(Exception):
+    """A new group's name isn't lowercase, and USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES requires it."""
+
+
+def lowercase_group_names_required() -> bool:
+    """Whether a new group's name must be lowercase: the USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES setting,
+    on by default. Only creating a group is checked; existing groups keep their case."""
+    return getattr(settings, "USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES", True)
+
+
 def set_project_user_status_to_pending(project_user_pk):
     """Sets the status of the project user to 'Pending'.
     This is used when there is an error adding the user to a group. We want to
@@ -50,6 +60,11 @@ def get_project_attribute_values_set(project, attribute_name):
 def _add_user_to_group(user: str, group: str, client: UserManagementClient) -> None:
     group_exists = client.group_exists(group)
     if not group_exists:
+        if lowercase_group_names_required() and group != group.lower():
+            raise GroupNameNotLowercaseError(
+                f"group {group} doesn't exist and its name isn't lowercase, so it wasn't created. Make the name "
+                "lowercase, or set USER_MANAGEMENT_REQUIRE_LOWERCASE_GROUP_NAMES = False to allow mixed case."
+            )
         logger.info("Creating group %s...", group)
         client.create_group(group)
     if client.user_in_group(user, group):
